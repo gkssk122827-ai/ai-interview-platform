@@ -1,4 +1,4 @@
-from typing import Literal
+﻿from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +12,13 @@ class InterviewQuestionRequest(BaseModel):
     resumeContent: str = ""
     coverLetterContent: str = ""
     jobDescription: str = ""
+    interviewMode: str = "COMPREHENSIVE"
+    positionCategory: str = "BACKEND"
+    questionDifficulty: str = "MEDIUM"
+    questionIndex: int = Field(1, ge=1)
+    totalQuestionCount: int = Field(1, ge=1)
+    modeGuide: str = ""
+    existingQuestions: list[str] = Field(default_factory=list)
     conversationHistory: list[ConversationTurn] = Field(default_factory=list)
 
 

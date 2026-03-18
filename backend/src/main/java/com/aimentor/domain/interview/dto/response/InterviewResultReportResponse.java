@@ -1,5 +1,6 @@
 package com.aimentor.domain.interview.dto.response;
 
+import com.aimentor.domain.interview.entity.InterviewMode;
 import com.aimentor.domain.interview.entity.InterviewSessionStatus;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -16,6 +17,7 @@ public record InterviewResultReportResponse(
         Long jobPostingId,
         String title,
         String positionTitle,
+        InterviewMode mode,
         InterviewSessionStatus status,
         LocalDateTime startedAt,
         LocalDateTime endedAt,

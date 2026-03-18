@@ -2,6 +2,7 @@ package com.aimentor.external.ai;
 
 import com.aimentor.external.ai.dto.FeedbackDto;
 import com.aimentor.external.ai.dto.GradeResultDto;
+import com.aimentor.external.ai.dto.InterviewQuestionGenerationContext;
 import com.aimentor.external.ai.dto.ProblemDto;
 import java.util.List;
 
@@ -14,6 +15,7 @@ public interface AiService {
             String resumeContent,
             String coverLetterContent,
             String jobDescription,
+            InterviewQuestionGenerationContext context,
             List<ConversationTurnDto> history
     );
 

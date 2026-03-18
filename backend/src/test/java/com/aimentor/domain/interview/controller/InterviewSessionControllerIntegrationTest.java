@@ -1,11 +1,13 @@
 package com.aimentor.domain.interview.controller;
 
+import com.aimentor.domain.user.entity.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
@@ -32,9 +34,13 @@ class InterviewSessionControllerIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     void interviewSessionLifecycleShouldWork() throws Exception {
         String accessToken = signupAndGetAccessToken("interview@example.com");
+        String adminAccessToken = signupAndGetAccessToken("interview-admin@example.com", Role.ADMIN);
         Long resumeId = createProfileDocument(
                 accessToken,
                 "/api/v1/profiles/resumes",
@@ -57,7 +63,7 @@ class InterviewSessionControllerIntegrationTest {
                         """
         );
         Long jobPostingId = createProfileDocument(
-                accessToken,
+                adminAccessToken,
                 "/api/v1/profiles/job-postings",
                 """
                         {
@@ -77,6 +83,7 @@ class InterviewSessionControllerIntegrationTest {
                                 {
                                   "title": "Backend Mock Interview",
                                   "positionTitle": "Backend Engineer",
+                                  "mode": "TECHNICAL",
                                   "resumeId": %d,
                                   "coverLetterId": %d,
                                   "jobPostingId": %d,
@@ -85,6 +92,7 @@ class InterviewSessionControllerIntegrationTest {
                                 """.formatted(resumeId, coverLetterId, jobPostingId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ONGOING"))
+                .andExpect(jsonPath("$.data.mode").value("TECHNICAL"))
                 .andExpect(jsonPath("$.data.questions.length()").value(2))
                 .andReturn();
 
@@ -131,7 +139,11 @@ class InterviewSessionControllerIntegrationTest {
     }
 
     private String signupAndGetAccessToken(String email) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/v1/auth/signup")
+        return signupAndGetAccessToken(email, Role.USER);
+    }
+
+    private String signupAndGetAccessToken(String email, Role role) throws Exception {
+        MvcResult signupResult = mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -144,7 +156,25 @@ class InterviewSessionControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+        if (role == Role.ADMIN) {
+            jdbcTemplate.update("UPDATE users SET role = ? WHERE email = ?", Role.ADMIN.name(), email);
+            MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {
+                                      "email": "%s",
+                                      "password": "password1"
+                                    }
+                                    """.formatted(email)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode response = objectMapper.readTree(loginResult.getResponse().getContentAsString());
+            String accessToken = response.path("data").path("accessToken").asText();
+            assertThat(accessToken).isNotBlank();
+            return accessToken;
+        }
+
+        JsonNode response = objectMapper.readTree(signupResult.getResponse().getContentAsString());
         String accessToken = response.path("data").path("accessToken").asText();
         assertThat(accessToken).isNotBlank();
         return accessToken;

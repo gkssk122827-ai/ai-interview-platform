@@ -1,4 +1,4 @@
-import json
+﻿import json
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -23,8 +23,6 @@ class InterviewService:
         llm = self._create_llm()
         template = self._load_prompt("interview_question.txt")
 
-        # The prompt is structured to force a single, interviewer-style question
-        # grounded in candidate materials and prior answers.
         prompt = PromptTemplate.from_template(template)
         chain = prompt | llm
         response = await chain.ainvoke(
@@ -32,6 +30,13 @@ class InterviewService:
                 "resume_content": payload.resumeContent or "",
                 "cover_letter_content": payload.coverLetterContent or "",
                 "job_description": payload.jobDescription or "",
+                "interview_mode": payload.interviewMode or "COMPREHENSIVE",
+                "position_category": payload.positionCategory or "BACKEND",
+                "question_difficulty": payload.questionDifficulty or "MEDIUM",
+                "question_index": payload.questionIndex,
+                "total_question_count": payload.totalQuestionCount,
+                "mode_guide": payload.modeGuide or "",
+                "existing_questions": self._format_existing_questions(payload.existingQuestions),
                 "conversation_history": self._format_history(payload.conversationHistory),
             }
         )
@@ -43,8 +48,6 @@ class InterviewService:
         llm = self._create_llm()
         template = self._load_prompt("interview_feedback.txt")
 
-        # The prompt is designed to return structured scoring and actionable coaching
-        # instead of free-form narrative so the backend can consume it safely.
         prompt = PromptTemplate.from_template(template)
         chain = prompt | llm
         response = await chain.ainvoke(
@@ -85,6 +88,11 @@ class InterviewService:
             lines.append(f"{index}. Question: {turn.question}")
             lines.append(f"{index}. Answer: {turn.answer}")
         return "\n".join(lines)
+
+    def _format_existing_questions(self, questions: list[str]) -> str:
+        if not questions:
+            return "No prior generated questions."
+        return "\n".join(f"{index}. {question}" for index, question in enumerate(questions, start=1))
 
     def _parse_json_response(self, content: str, error_code: str) -> dict:
         try:

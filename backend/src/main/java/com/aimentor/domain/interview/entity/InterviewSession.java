@@ -45,6 +45,10 @@ public class InterviewSession extends BaseTimeEntity {
     @Column(nullable = false, length = 100)
     private String positionTitle;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private InterviewMode mode;
+
     private Long applicationDocumentId;
 
     private Long resumeId;
@@ -89,6 +93,7 @@ public class InterviewSession extends BaseTimeEntity {
             User user,
             String title,
             String positionTitle,
+            InterviewMode mode,
             Long applicationDocumentId,
             Long resumeId,
             Long coverLetterId,
@@ -103,6 +108,7 @@ public class InterviewSession extends BaseTimeEntity {
         this.user = user;
         this.title = title;
         this.positionTitle = positionTitle;
+        this.mode = mode;
         this.applicationDocumentId = applicationDocumentId;
         this.resumeId = resumeId;
         this.coverLetterId = coverLetterId;

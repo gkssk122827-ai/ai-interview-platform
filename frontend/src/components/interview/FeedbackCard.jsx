@@ -1,7 +1,7 @@
 function FeedbackCard({
   feedback,
   title = 'AI 피드백',
-  description = '답변을 저장하면 현재 상태에 대한 피드백을 보여 줍니다.',
+  description = '답변을 저장하면 현재 상태에 대한 피드백을 보여 드립니다.',
 }) {
   return (
     <article className="panel">

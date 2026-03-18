@@ -1,5 +1,5 @@
 function QuestionCard({ question, index, total, mode }) {
-  const answeredLabel = question?.answered ? '답변 저장 완료' : '아직 답변 전'
+  const answeredLabel = question?.answered ? '답변 작성 완료' : '아직 답변 전'
 
   return (
     <article className="panel interview-card">

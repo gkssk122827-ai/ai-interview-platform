@@ -9,6 +9,9 @@ import com.aimentor.domain.interview.dto.response.InterviewLearningRecommendatio
 import com.aimentor.domain.interview.dto.response.InterviewQuestionResponse;
 import com.aimentor.domain.interview.dto.response.InterviewResultReportResponse;
 import com.aimentor.domain.interview.dto.response.InterviewSessionResponse;
+import com.aimentor.domain.interview.entity.InterviewMode;
+import com.aimentor.domain.interview.service.InterviewQuestionCatalog.InterviewQuestionCategory;
+import com.aimentor.domain.interview.service.InterviewQuestionCatalog.InterviewQuestionDifficulty;
 import com.aimentor.domain.interview.entity.InterviewAnswer;
 import com.aimentor.domain.interview.entity.InterviewFeedback;
 import com.aimentor.domain.interview.entity.InterviewQuestion;
@@ -31,11 +34,13 @@ import com.aimentor.domain.user.repository.UserRepository;
 import com.aimentor.external.ai.AiService;
 import com.aimentor.external.ai.ConversationTurnDto;
 import com.aimentor.external.ai.dto.FeedbackDto;
+import com.aimentor.external.ai.dto.InterviewQuestionGenerationContext;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -53,6 +58,10 @@ public class InterviewSessionService {
     private static final Logger log = LoggerFactory.getLogger(InterviewSessionService.class);
     private static final int DEFAULT_QUESTION_COUNT = 3;
     private static final int MAX_CONTEXT_LENGTH = 3000;
+    private static final int MAX_AI_GENERATION_RETRIES = 3;
+    private static final Set<String> QUESTION_STOP_WORDS = Set.of(
+            "무엇", "설명", "주세요", "말해", "있다면", "있나요", "어떻게", "경험", "기술", "프로젝트", "기반", "지원서", "이력서", "직무"
+    );
 
     private final InterviewSessionRepository interviewSessionRepository;
     private final InterviewQuestionRepository interviewQuestionRepository;
@@ -101,6 +110,7 @@ public class InterviewSessionService {
                 .user(user)
                 .title(request.title())
                 .positionTitle(request.positionTitle())
+                .mode(resolveInterviewMode(request.mode()))
                 .applicationDocumentId(applicationDocument == null ? null : applicationDocument.getId())
                 .resumeId(request.resumeId())
                 .coverLetterId(request.coverLetterId())
@@ -208,6 +218,7 @@ public class InterviewSessionService {
                 interviewSession.getJobPostingId(),
                 interviewSession.getTitle(),
                 interviewSession.getPositionTitle(),
+                interviewSession.getMode(),
                 interviewSession.getStatus(),
                 interviewSession.getStartedAt(),
                 interviewSession.getEndedAt(),
@@ -236,7 +247,7 @@ public class InterviewSessionService {
                     aiQuestions,
                     "AI",
                     false,
-                    "AI-generated interview questions are ready."
+                    "AI 기반으로 면접 질문을 생성했습니다."
             );
         } catch (RuntimeException ex) {
             log.warn("[Interview] Falling back to mock question generation. sessionId={}", session.getId(), ex);
@@ -244,31 +255,30 @@ public class InterviewSessionService {
                     buildMockQuestions(session, questionCount),
                     "MOCK",
                     true,
-                    "AI question generation failed, so the session started with fallback questions."
+                    "AI 질문 생성에 일시적인 문제가 있어 기본 질문으로 면접을 시작했습니다."
             );
         }
     }
-
     private List<InterviewQuestion> buildAiQuestions(InterviewSession session, int questionCount) {
         List<InterviewQuestion> questions = new ArrayList<>();
         List<String> generatedQuestions = new ArrayList<>();
+        InterviewMode mode = resolveInterviewMode(session.getMode());
+        InterviewQuestionCategory category = InterviewQuestionCatalog.resolveCategory(
+                session.getPositionTitle(),
+                session.getJobPostingSnapshot()
+        );
 
         for (int index = 1; index <= questionCount; index++) {
-            String questionText = aiService.generateInterviewQuestion(
-                    buildResumeGenerationInput(session),
-                    buildCoverLetterGenerationInput(session),
-                    buildJobGenerationInput(session, generatedQuestions, index, questionCount),
-                    List.of()
+            InterviewQuestionDifficulty difficulty = InterviewQuestionCatalog.resolveDifficulty(index, questionCount);
+            String normalizedQuestionText = generateAiQuestionWithRetry(
+                    session,
+                    generatedQuestions,
+                    mode,
+                    category,
+                    difficulty,
+                    index,
+                    questionCount
             );
-
-            if (!StringUtils.hasText(questionText)) {
-                throw new IllegalStateException("AI question text is empty.");
-            }
-
-            String normalizedQuestionText = questionText.trim();
-            if (generatedQuestions.stream().anyMatch(existing -> existing.equalsIgnoreCase(normalizedQuestionText))) {
-                throw new IllegalStateException("AI returned a duplicated interview question.");
-            }
 
             generatedQuestions.add(normalizedQuestionText);
             questions.add(InterviewQuestion.builder()
@@ -283,37 +293,53 @@ public class InterviewSessionService {
 
     private List<InterviewQuestion> buildMockQuestions(InterviewSession session, int questionCount) {
         List<InterviewQuestion> questions = new ArrayList<>();
+        List<String> generatedQuestions = new ArrayList<>();
+        InterviewMode mode = resolveInterviewMode(session.getMode());
+        InterviewQuestionCategory category = InterviewQuestionCatalog.resolveCategory(
+                session.getPositionTitle(),
+                session.getJobPostingSnapshot()
+        );
         for (int index = 1; index <= questionCount; index++) {
+            InterviewQuestionDifficulty difficulty = InterviewQuestionCatalog.resolveDifficulty(index, questionCount);
+            String questionText = buildFallbackQuestionText(session, generatedQuestions, index, mode, category, difficulty);
+            generatedQuestions.add(questionText);
             questions.add(InterviewQuestion.builder()
                     .interviewSession(session)
                     .sequenceNumber(index)
-                    .questionText(buildMockQuestionText(session, index))
+                    .questionText(questionText)
                     .build());
         }
         return questions;
     }
 
-    private String buildMockQuestionText(InterviewSession session, int index) {
-        return switch (index) {
-            case 1 -> session.getPositionTitle() + " 직무에 지원한 이유와 본인의 강점을 소개해 주세요.";
-            case 2 -> "최근 경험 중 " + session.getPositionTitle() + " 직무와 가장 관련 있는 프로젝트를 설명해 주세요.";
-            case 3 -> "협업이나 문제 해결 과정에서 본인이 주도적으로 기여한 사례를 말해 주세요.";
-            default -> "지원 직무와 연결되는 경험이나 역량을 구체적인 사례와 함께 설명해 주세요. (" + index + ")";
-        };
+    private String buildFallbackQuestionText(
+            InterviewSession session,
+            List<String> generatedQuestions,
+            int index,
+            InterviewMode mode,
+            InterviewQuestionCategory category,
+            InterviewQuestionDifficulty difficulty
+    ) {
+        List<String> questions = InterviewQuestionCatalog.findQuestions(mode, category, difficulty);
+        String candidate = selectQuestionCandidate(session, questions, generatedQuestions, index, difficulty);
+        if (StringUtils.hasText(session.getPositionTitle())
+                && !candidate.contains(session.getPositionTitle())
+                && index == 1) {
+            return session.getPositionTitle() + " 직무를 기준으로 답변해 주세요. " + candidate;
+        }
+        return candidate;
     }
-
     private FeedbackDto buildPendingFeedback() {
         return new FeedbackDto(
                 0,
                 0,
                 0,
                 0,
-                "No weak points yet. Start answering questions.",
-                "Provide concrete examples and structure your answers clearly.",
-                "Use the STAR format and mention measurable impact."
+                "아직 저장된 답변이 없어 결과를 분석할 수 없습니다.",
+                "각 답변을 두세 문장 이상으로 작성하고, 본인의 역할과 선택 이유를 함께 설명해 보세요.",
+                "상황, 행동, 결과를 순서대로 정리하고 성과나 수치 근거를 덧붙이면 더 좋은 답변이 됩니다."
         );
     }
-
     private FeedbackDto buildSessionFeedback(InterviewSession session) {
         if (session.getAnsweredQuestionCount() == 0) {
             return buildPendingFeedback();
@@ -332,23 +358,113 @@ public class InterviewSessionService {
     }
 
     private FeedbackDto buildFallbackFeedback(InterviewSession session) {
-        long answeredCount = session.getAnsweredQuestionCount();
-        int relevanceScore = (int) Math.min(100, 55 + answeredCount * 10);
-        int logicScore = (int) Math.min(100, 50 + answeredCount * 12);
-        int specificityScore = (int) Math.min(100, 45 + answeredCount * 15);
+        List<ConversationTurnDto> history = buildConversationHistory(session);
+        AnswerAnalysis analysis = analyzeAnswers(history);
+
+        int relevanceScore = clampScore(48 + analysis.answeredCount() * 8 + analysis.keywordHits() * 4 + analysis.averageLength() / 18);
+        int logicScore = clampScore(45 + analysis.answeredCount() * 7 + analysis.structureHits() * 6 + analysis.averageLength() / 22);
+        int specificityScore = clampScore(40 + analysis.answeredCount() * 7 + analysis.metricHits() * 8 + analysis.averageLength() / 16);
         int overallScore = Math.round((relevanceScore + logicScore + specificityScore) / 3.0f);
+
+        String weakPoints = buildWeakPointsMessage(analysis, session.getAnsweredQuestionCount(), session.getTotalQuestionCount());
+        String improvements = buildImprovementsMessage(analysis);
+        String recommendedAnswer = buildRecommendedAnswerMessage(analysis);
 
         return new FeedbackDto(
                 logicScore,
                 relevanceScore,
                 specificityScore,
                 overallScore,
-                "Fallback weak points: some answers still need clearer evidence and tighter structure.",
-                "Fallback improvements: explain your role, actions, and outcomes in a more structured way.",
-                "Fallback recommended answer: briefly explain the context, your action, the result, and what you learned."
+                weakPoints,
+                improvements,
+                recommendedAnswer
         );
     }
 
+    private AnswerAnalysis analyzeAnswers(List<ConversationTurnDto> history) {
+        int answeredCount = history == null ? 0 : history.size();
+        if (answeredCount == 0) {
+            return new AnswerAnalysis(0, 0, 0, 0, 0);
+        }
+        int totalLength = 0;
+        int structureHits = 0;
+        int metricHits = 0;
+        int keywordHits = 0;
+        for (ConversationTurnDto turn : history) {
+            String answer = turn.answer() == null ? "" : turn.answer().trim();
+            totalLength += answer.length();
+            structureHits += countMatches(answer, "상황", "문제", "목표", "과정", "행동", "결과", "배운", "이유");
+            metricHits += countMatches(answer, "%", "건", "명", "개월", "주", "배", "ms", "초", "성능", "지표");
+            keywordHits += countMatches(answer, "사용", "구현", "개선", "설계", "작업", "테스트", "배포", "최적화", "해결");
+        }
+        int averageLength = totalLength / answeredCount;
+        return new AnswerAnalysis(answeredCount, averageLength, structureHits, metricHits, keywordHits);
+    }
+    private int countMatches(String text, String... keywords) {
+        if (!StringUtils.hasText(text)) {
+            return 0;
+        }
+
+        int count = 0;
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int clampScore(int score) {
+        return Math.max(0, Math.min(100, score));
+    }
+
+    private String buildWeakPointsMessage(AnswerAnalysis analysis, int answeredCount, int totalQuestionCount) {
+        List<String> weakPoints = new ArrayList<>();
+        if (answeredCount < totalQuestionCount) {
+            weakPoints.add("아직 답변하지 않은 질문이 남아 있어 전체 평가가 제한적입니다.");
+        }
+        if (analysis.averageLength() < 60) {
+            weakPoints.add("답변 길이가 짧아 핵심 근거와 맥락이 충분히 드러나지 않았습니다.");
+        }
+        if (analysis.metricHits() == 0) {
+            weakPoints.add("성과 수치나 결과 지표가 부족해 구체성이 약하게 보입니다.");
+        }
+        if (analysis.structureHits() < answeredCount * 2) {
+            weakPoints.add("상황, 행동, 결과가 분리되지 않아 답변 구조가 다소 흐릿합니다.");
+        }
+        if (weakPoints.isEmpty()) {
+            weakPoints.add("전반적으로 안정적이지만, 조금 더 구체적인 사례를 더하면 설득력이 높아집니다.");
+        }
+        return String.join(" ", weakPoints);
+    }
+    private String buildImprovementsMessage(AnswerAnalysis analysis) {
+        List<String> improvements = new ArrayList<>();
+        if (analysis.averageLength() < 60) {
+            improvements.add("각 답변을 두세 문장 이상으로 확장해 맥락을 먼저 설명해 보세요.");
+        }
+        if (analysis.structureHits() < analysis.answeredCount() * 2) {
+            improvements.add("STAR 방식처럼 상황, 행동, 결과를 순서대로 나누어 답변해 보세요.");
+        }
+        if (analysis.metricHits() == 0) {
+            improvements.add("성능 개선 수치, 일정, 사용자 수 같은 정량 정보를 한 가지 이상 포함해 보세요.");
+        }
+        if (analysis.keywordHits() < analysis.answeredCount() * 2) {
+            improvements.add("본인이 직접 사용한 기술과 해결 방법을 더 분명하게 설명해 보세요.");
+        }
+        if (improvements.isEmpty()) {
+            improvements.add("현재 답변 구조는 좋습니다. 다음 연습에서는 의사결정 이유와 트레이드오프까지 덧붙여 보세요.");
+        }
+        return String.join(" ", improvements);
+    }
+    private String buildRecommendedAnswerMessage(AnswerAnalysis analysis) {
+        if (analysis.averageLength() < 60) {
+            return "질문 의도를 먼저 짚고, 본인이 맡은 역할과 해결 과정을 설명한 뒤 마지막에 결과와 배운 점을 정리해 보세요.";
+        }
+        if (analysis.metricHits() == 0) {
+            return "답변 마지막에 성과 수치나 개선 결과를 한 문장으로 덧붙이면 훨씬 설득력 있는 답변이 됩니다.";
+        }
+        return "상황, 행동, 결과를 유지하면서 기술 선택 이유와 다른 대안까지 설명하면 더 완성도 높은 답변이 됩니다.";
+    }
     private void replaceSessionFeedback(InterviewSession interviewSession, FeedbackDto content) {
         InterviewFeedback currentFeedback = interviewSession.getFeedback();
         if (currentFeedback != null) {
@@ -524,6 +640,7 @@ public class InterviewSessionService {
                 interviewSession.getJobPostingId(),
                 interviewSession.getTitle(),
                 interviewSession.getPositionTitle(),
+                interviewSession.getMode(),
                 interviewSession.getStatus(),
                 interviewSession.getStartedAt(),
                 interviewSession.getEndedAt(),
@@ -546,6 +663,7 @@ public class InterviewSessionService {
         StringBuilder builder = new StringBuilder();
         appendLabeledSection(builder, "Session title", session.getTitle());
         appendLabeledSection(builder, "Target position", session.getPositionTitle());
+        appendLabeledSection(builder, "Interview mode", resolveInterviewMode(session.getMode()).name());
         appendLabeledSection(builder, "Application document snapshot", session.getApplicationDocumentSnapshot());
         appendLabeledSection(builder, "Resume snapshot", session.getResumeSnapshot());
         return limitText(builder.toString(), MAX_CONTEXT_LENGTH);
@@ -555,6 +673,7 @@ public class InterviewSessionService {
         StringBuilder builder = new StringBuilder();
         appendLabeledSection(builder, "Session title", session.getTitle());
         appendLabeledSection(builder, "Target position", session.getPositionTitle());
+        appendLabeledSection(builder, "Interview mode", resolveInterviewMode(session.getMode()).name());
         appendLabeledSection(builder, "Application document snapshot", session.getApplicationDocumentSnapshot());
         appendLabeledSection(builder, "Cover letter snapshot", session.getCoverLetterSnapshot());
         return limitText(builder.toString(), MAX_CONTEXT_LENGTH);
@@ -564,18 +683,182 @@ public class InterviewSessionService {
             InterviewSession session,
             List<String> generatedQuestions,
             int questionIndex,
-            int totalQuestionCount
+            int totalQuestionCount,
+            InterviewMode mode,
+            InterviewQuestionCategory category,
+            InterviewQuestionDifficulty difficulty
     ) {
         StringBuilder builder = new StringBuilder();
         appendLabeledSection(builder, "Session title", session.getTitle());
         appendLabeledSection(builder, "Target position", session.getPositionTitle());
+        appendLabeledSection(builder, "Interview mode", mode.name());
         appendLabeledSection(builder, "Planned question number", questionIndex + " / " + totalQuestionCount);
+        appendLabeledSection(builder, "Question category", category.name());
+        appendLabeledSection(builder, "Question difficulty", difficulty.name());
+        appendLabeledSection(builder, "Mode guidance", buildModeGuide(mode, category, difficulty, questionIndex, totalQuestionCount));
         appendLabeledSection(builder, "Job posting snapshot", session.getJobPostingSnapshot());
         if (!generatedQuestions.isEmpty()) {
             appendLabeledSection(builder, "Already generated questions", String.join("\n", generatedQuestions));
-            appendLabeledSection(builder, "Generation rule", "Do not repeat the already generated questions.");
+            appendLabeledSection(builder, "Generation rule", "Do not repeat or paraphrase the already generated questions.");
         }
         return limitText(builder.toString(), MAX_CONTEXT_LENGTH);
+    }
+
+    private String generateAiQuestionWithRetry(
+            InterviewSession session,
+            List<String> generatedQuestions,
+            InterviewMode mode,
+            InterviewQuestionCategory category,
+            InterviewQuestionDifficulty difficulty,
+            int questionIndex,
+            int totalQuestionCount
+    ) {
+        RuntimeException lastException = null;
+
+        for (int attempt = 1; attempt <= MAX_AI_GENERATION_RETRIES; attempt++) {
+            try {
+                InterviewQuestionGenerationContext context = new InterviewQuestionGenerationContext(
+                        mode.name(),
+                        category.name(),
+                        difficulty.name(),
+                        questionIndex,
+                        totalQuestionCount,
+                        buildModeGuide(mode, category, difficulty, questionIndex, totalQuestionCount),
+                        List.copyOf(generatedQuestions)
+                );
+                String questionText = aiService.generateInterviewQuestion(
+                        buildResumeGenerationInput(session),
+                        buildCoverLetterGenerationInput(session),
+                        buildJobGenerationInput(session, generatedQuestions, questionIndex, totalQuestionCount, mode, category, difficulty),
+                        context,
+                        List.of()
+                );
+                if (!StringUtils.hasText(questionText)) {
+                    throw new IllegalStateException("AI question text is empty.");
+                }
+
+                String normalizedQuestionText = questionText.trim();
+                if (containsSimilarQuestion(generatedQuestions, normalizedQuestionText)) {
+                    throw new IllegalStateException("AI returned a duplicated or similar interview question.");
+                }
+                return normalizedQuestionText;
+            } catch (RuntimeException ex) {
+                lastException = ex;
+            }
+        }
+
+        throw lastException == null
+                ? new IllegalStateException("Failed to generate interview question.")
+                : lastException;
+    }
+
+    private String selectQuestionCandidate(
+            InterviewSession session,
+            List<String> candidates,
+            List<String> generatedQuestions,
+            int index,
+            InterviewQuestionDifficulty difficulty
+    ) {
+        if (candidates.isEmpty()) {
+            throw new IllegalStateException("Fallback question catalog is empty.");
+        }
+
+        int seed = Long.hashCode(session.getId() == null ? index : session.getId())
+                + safeHash(session.getTitle())
+                + safeHash(session.getPositionTitle())
+                + difficulty.ordinal() * 17
+                + index * 13;
+        int startIndex = Math.floorMod(seed, candidates.size());
+
+        for (int offset = 0; offset < candidates.size(); offset++) {
+            String candidate = candidates.get((startIndex + offset) % candidates.size());
+            if (!containsSimilarQuestion(generatedQuestions, candidate)) {
+                return candidate;
+            }
+        }
+
+        return candidates.get(startIndex);
+    }
+
+    private InterviewMode resolveInterviewMode(InterviewMode mode) {
+        return mode == null ? InterviewMode.COMPREHENSIVE : mode;
+    }
+
+    private String buildModeGuide(
+            InterviewMode mode,
+            InterviewQuestionCategory category,
+            InterviewQuestionDifficulty difficulty,
+            int questionIndex,
+            int totalQuestionCount
+    ) {
+        String jobGuide = category == InterviewQuestionCategory.FRONTEND
+                ? "Focus on frontend UI architecture, rendering, browser behavior, performance, accessibility, and collaboration with design."
+                : "Focus on backend API design, data consistency, transactions, performance, scalability, operations, and collaboration with product and frontend.";
+        String difficultyGuide = switch (difficulty) {
+            case EASY -> "Keep the question accessible and confirm fundamentals or a concrete first-hand example.";
+            case MEDIUM -> "Require applied experience, problem solving steps, tradeoffs, or collaboration details.";
+            case HARD -> "Probe architecture, ambiguous tradeoffs, leadership judgment, or deep troubleshooting.";
+        };
+        String modeGuide = switch (mode) {
+            case BEHAVIORAL -> "Ask about collaboration, conflict, failure, motivation, ownership, growth, and decision making. Do not drift into textbook theory.";
+            case TECHNICAL -> "Ask technical questions about domain knowledge, troubleshooting, system design, performance, and CS fundamentals. Require concrete reasoning.";
+            case COMPREHENSIVE -> questionIndex % 2 == 1
+                    ? "This is a mixed interview. Prefer a behavioral or experience-driven question tied to technical work for this slot."
+                    : "This is a mixed interview. Prefer a technical or troubleshooting question tied to real project context for this slot.";
+            case RESUME_BASED -> "Anchor the question to resume, cover letter, project claims, metrics, ownership, and consistency of the candidate's submitted materials.";
+        };
+        return modeGuide + " " + jobGuide + " " + difficultyGuide
+                + " Question slot is " + questionIndex + " out of " + totalQuestionCount + ".";
+    }
+
+    private boolean containsSimilarQuestion(List<String> existingQuestions, String candidate) {
+        return existingQuestions.stream().anyMatch(existing -> isSimilarQuestion(existing, candidate));
+    }
+
+    private boolean isSimilarQuestion(String left, String right) {
+        String normalizedLeft = normalizeQuestion(left);
+        String normalizedRight = normalizeQuestion(right);
+        if (!StringUtils.hasText(normalizedLeft) || !StringUtils.hasText(normalizedRight)) {
+            return false;
+        }
+        if (normalizedLeft.equals(normalizedRight)) {
+            return true;
+        }
+
+        Set<String> leftTokens = tokenizeQuestion(left);
+        Set<String> rightTokens = tokenizeQuestion(right);
+        if (leftTokens.isEmpty() || rightTokens.isEmpty()) {
+            return false;
+        }
+
+        long intersection = leftTokens.stream().filter(rightTokens::contains).count();
+        int union = leftTokens.size() + rightTokens.size() - (int) intersection;
+        double similarity = union == 0 ? 0.0 : (double) intersection / union;
+        return similarity >= 0.6;
+    }
+
+    private String normalizeQuestion(String questionText) {
+        if (!StringUtils.hasText(questionText)) {
+            return "";
+        }
+        return questionText.toLowerCase().replaceAll("[^\\p{L}\\p{N}]", "");
+    }
+
+    private Set<String> tokenizeQuestion(String questionText) {
+        if (!StringUtils.hasText(questionText)) {
+            return Set.of();
+        }
+        return Set.copyOf(List.of(questionText.toLowerCase()
+                .replaceAll("[^\\p{L}\\p{N}]+", " ")
+                .trim()
+                .split("\\s+")).stream()
+                .filter(token -> token.length() >= 2)
+                .filter(token -> !QUESTION_STOP_WORDS.contains(token))
+                .toList());
+    }
+
+    private int safeHash(String value) {
+        return value == null ? 0 : value.hashCode();
     }
 
     private void appendLabeledSection(StringBuilder builder, String label, String value) {
@@ -662,10 +945,10 @@ public class InterviewSessionService {
         int completionRate = calculateCompletionRate(totalQuestions, answeredQuestions);
         int overallScore = feedback == null || feedback.overallScore() == null ? 0 : feedback.overallScore();
         if (answeredQuestions == 0) {
-            return "No answers were saved in this session. Save at least one answer to receive a meaningful analysis.";
+            return "아직 저장된 답변이 없습니다. 답변을 저장하면 결과 요약과 개선 방향을 함께 보여드립니다.";
         }
-        return "This session covered " + totalQuestions + " questions, with " + answeredQuestions + " answers saved. "
-                + "Completion reached " + completionRate + "% and the overall feedback score is " + overallScore + ".";
+        return "전체 " + totalQuestions + "개 질문 중 " + answeredQuestions + "개에 답변했습니다. "
+                + "완료율은 " + completionRate + "%이며 현재 종합 점수는 " + overallScore + "점입니다.";
     }
 
     private List<String> buildHighlights(
@@ -675,14 +958,14 @@ public class InterviewSessionService {
             int answeredQuestions
     ) {
         List<String> highlights = new ArrayList<>();
-        highlights.add("Answered " + answeredQuestions + " out of " + totalQuestions + " questions.");
+        highlights.add("전체 " + totalQuestions + "개 질문 중 " + answeredQuestions + "개에 답변했습니다.");
         if (session.getStatus() == InterviewSessionStatus.COMPLETED) {
-            highlights.add("The session was completed and the final feedback has been stored.");
+            highlights.add("면접이 정상적으로 종료되었습니다. 결과를 바탕으로 다음 연습 방향을 확인해 보세요.");
         } else {
-            highlights.add("The session is still ongoing. Final feedback can improve after completion.");
+            highlights.add("아직 답변하지 않은 질문이 남아 있습니다. 면접을 마무리하면 더 정확한 결과를 볼 수 있습니다.");
         }
         if (feedback != null && feedback.overallScore() != null) {
-            highlights.add("Current overall score: " + feedback.overallScore() + ".");
+            highlights.add("현재 종합 점수는 " + feedback.overallScore() + "점입니다.");
         }
         if (feedback != null && StringUtils.hasText(feedback.improvements())) {
             highlights.add(feedback.improvements());
@@ -697,51 +980,57 @@ public class InterviewSessionService {
         List<InterviewLearningRecommendationResponse> recommendations = new ArrayList<>();
         if (feedback == null) {
             recommendations.add(new InterviewLearningRecommendationResponse(
-                    "Answer completion",
-                    "There is not enough feedback yet because the session has no saved answers.",
-                    "Finish at least one answer before moving to follow-up learning."
+                    "답변 연습",
+                    "아직 분석할 답변이 없어 학습 추천을 만들 수 없습니다.",
+                    "질문에 답변을 저장한 뒤 결과 화면에서 다시 추천 학습을 확인해 보세요."
             ));
             return recommendations;
         }
-
         if (feedback.logicScore() != null && feedback.logicScore() < 75) {
             recommendations.add(new InterviewLearningRecommendationResponse(
-                    "Answer structure",
-                    "Logic score is below the target range.",
-                    "Practice STAR-based speaking drills and focus on sequencing context, action, and result."
+                    "답변 구조",
+                    "논리성 점수가 낮아 답변 흐름을 더 정리할 필요가 있습니다.",
+                    "STAR 방식으로 상황, 행동, 결과를 나누어 말하는 연습을 해보세요."
             ));
         }
         if (feedback.relevanceScore() != null && feedback.relevanceScore() < 75) {
             recommendations.add(new InterviewLearningRecommendationResponse(
-                    "Role alignment",
-                    "Relevance score suggests your answers are not consistently tied back to the target role.",
-                    "Review the job posting and rewrite each answer to connect directly to the required skills."
+                    "직무 연관성",
+                    "답변이 지원 직무와 직접 연결되는 근거가 부족해 보입니다.",
+                    "직무 요구사항과 연결되는 경험을 한 가지씩 다시 정리해 보세요."
             ));
         }
         if (feedback.specificityScore() != null && feedback.specificityScore() < 75) {
             recommendations.add(new InterviewLearningRecommendationResponse(
-                    "Evidence and metrics",
-                    "Specificity score shows that examples can be more concrete.",
-                    "Add measurable outcomes, ownership scope, and technical details to each answer."
+                    "구체성 강화",
+                    "답변에 성과 수치나 구체적인 사례가 더 필요합니다.",
+                    "수치, 일정, 사용 기술, 성과 결과를 포함해 답변을 다시 써 보세요."
             ));
         }
         if (unansweredQuestions > 0) {
             recommendations.add(new InterviewLearningRecommendationResponse(
-                    "Completion",
-                    "Some interview questions were left unanswered.",
-                    "Return to the session or rehearse short draft answers for the unanswered questions first."
+                    "미응답 보완",
+                    "아직 답변하지 않은 질문이 남아 있습니다.",
+                    "남은 질문까지 답변을 채운 뒤 전체 결과를 다시 확인해 보세요."
             ));
         }
         if (recommendations.isEmpty()) {
             recommendations.add(new InterviewLearningRecommendationResponse(
-                    "Advanced refinement",
-                    "Core scores are stable across the session.",
-                    "Move on to higher-difficulty mock interviews and refine concise delivery."
+                    "심화 연습",
+                    "전반적으로 안정적인 답변을 보여 주고 있습니다.",
+                    "다음 연습에서는 의사결정 이유와 대안 비교까지 포함해 답변을 고도화해 보세요."
             ));
         }
         return recommendations;
     }
-
+    private record AnswerAnalysis(
+            int answeredCount,
+            int averageLength,
+            int structureHits,
+            int metricHits,
+            int keywordHits
+    ) {
+    }
     private record QuestionGenerationResult(
             List<InterviewQuestion> questions,
             String source,

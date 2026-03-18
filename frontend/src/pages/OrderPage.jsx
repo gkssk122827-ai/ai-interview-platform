@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import EmptyState from '../components/common/EmptyState.jsx'
 import ErrorBlock from '../components/common/ErrorBlock.jsx'
@@ -9,11 +9,14 @@ import usePageTitle from '../hooks/usePageTitle.js'
 
 function OrderPage() {
   usePageTitle('주문')
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const selectedOrderId = searchParams.get('orderId')
   const [orders, setOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedOrder, setSelectedOrder] = useState(null)
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
 
   useEffect(() => {
     async function loadOrders() {
@@ -32,7 +35,42 @@ function OrderPage() {
     loadOrders()
   }, [])
 
-  const selectedOrder = useMemo(() => orders.find((order) => String(order.id) === String(selectedOrderId)) ?? orders[0] ?? null, [orders, selectedOrderId])
+  useEffect(() => {
+    if (!orders.length || selectedOrderId) {
+      return
+    }
+
+    setSearchParams({ orderId: String(orders[0].id) }, { replace: true })
+  }, [orders, selectedOrderId, setSearchParams])
+
+  useEffect(() => {
+    async function loadOrderDetail() {
+      if (!selectedOrderId) {
+        setSelectedOrder(null)
+        setDetailError('')
+        return
+      }
+
+      setIsDetailLoading(true)
+      setDetailError('')
+
+      try {
+        const result = await orderApi.get(selectedOrderId)
+        setSelectedOrder(result)
+      } catch (loadError) {
+        setSelectedOrder(null)
+        setDetailError(loadError.message)
+      } finally {
+        setIsDetailLoading(false)
+      }
+    }
+
+    loadOrderDetail()
+  }, [selectedOrderId])
+
+  function handleSelectOrder(orderId) {
+    setSearchParams({ orderId: String(orderId) })
+  }
 
   if (isLoading) {
     return <section className="workspace-page"><LoadingBlock label={STATUS_MESSAGES.loadingOrders} /></section>
@@ -58,18 +96,25 @@ function OrderPage() {
             <div className="panel__header"><div><h3 className="panel__title">주문 목록</h3></div></div>
             <div className="resource-list">
               {orders.map((order) => (
-                <div key={order.id} className={String(order.id) === String(selectedOrder?.id) ? 'resource-list__item resource-list__item--active' : 'resource-list__item resource-list__item--static'}>
+                <button
+                  key={order.id}
+                  type="button"
+                  className={String(order.id) === String(selectedOrder?.id) ? 'resource-list__item resource-list__item--active' : 'resource-list__item'}
+                  onClick={() => handleSelectOrder(order.id)}
+                >
                   <strong>주문 #{order.id}</strong>
                   <span>{order.status} · {order.totalPrice}원</span>
                   <span>{order.orderedAt}</span>
-                </div>
+                </button>
               ))}
             </div>
           </article>
 
           <article className="panel panel--wide">
             <div className="panel__header"><div><h3 className="panel__title">주문 상세</h3></div></div>
-            {selectedOrder ? (
+            {isDetailLoading ? <LoadingBlock label="주문 상세를 불러오는 중입니다." /> : null}
+            {!isDetailLoading && detailError ? <ErrorBlock message={detailError} /> : null}
+            {!isDetailLoading && !detailError && selectedOrder ? (
               <>
                 <p className="panel__subtitle">상태: {selectedOrder.status}</p>
                 <p className="panel__subtitle">배송지: {selectedOrder.address}</p>
@@ -83,7 +128,10 @@ function OrderPage() {
                   ))}
                 </div>
               </>
-            ) : <EmptyState title={EMPTY_MESSAGES.orders.title} description={EMPTY_MESSAGES.orders.description} />}
+            ) : null}
+            {!isDetailLoading && !detailError && !selectedOrder ? (
+              <EmptyState title={EMPTY_MESSAGES.orders.title} description={EMPTY_MESSAGES.orders.description} />
+            ) : null}
           </article>
         </div>
       ) : null}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import LoadingBlock from '../components/common/LoadingBlock.jsx'
 import ErrorBlock from '../components/common/ErrorBlock.jsx'
+import LoadingBlock from '../components/common/LoadingBlock.jsx'
 import StatusMessage from '../components/common/StatusMessage.jsx'
 import AnswerInput from '../components/interview/AnswerInput.jsx'
 import FeedbackCard from '../components/interview/FeedbackCard.jsx'
@@ -10,8 +10,16 @@ import interviewApi from '../api/interviewApi.js'
 import { BUTTON_LABELS, STATUS_MESSAGES } from '../constants/messages.js'
 import usePageTitle from '../hooks/usePageTitle.js'
 
+const modeLabels = {
+  COMPREHENSIVE: '종합',
+  BEHAVIORAL: '인성',
+  TECHNICAL: '기술',
+  RESUME_BASED: '자소서 기반',
+}
+
 function InterviewSessionPage() {
   usePageTitle('면접 진행')
+
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -53,30 +61,55 @@ function InterviewSessionPage() {
     loadSession()
   }, [sessionId])
 
-  const currentQuestion = useMemo(
-    () => session?.questions?.[currentQuestionIndex] ?? null,
-    [session, currentQuestionIndex],
-  )
-  const feedbackMessage = session?.feedback?.improvements ?? session?.feedback?.weakPoints ?? ''
+  const currentQuestion = useMemo(() => session?.questions?.[currentQuestionIndex] ?? null, [session, currentQuestionIndex])
+  const feedbackMessage = session?.feedback?.improvements ?? session?.feedback?.weakPoints ?? '답변을 저장하면 다음 개선 방향을 안내해 드립니다.'
+  const isLastQuestion = session ? currentQuestionIndex >= session.questions.length - 1 : false
+  const normalizedAnswer = answer.trim()
+  const existingAnswer = currentQuestion?.answerText?.trim() ?? ''
+  const canAdvance = Boolean(normalizedAnswer) || Boolean(existingAnswer)
+  const modeLabel = modeLabels[session?.mode] ?? '면접'
 
-  async function handleSubmitAnswer() {
-    if (!currentQuestion || !answer.trim()) return
+  function moveToNextQuestion(updatedSession) {
+    if (!updatedSession) return
+
+    const nextIndex = currentQuestionIndex + 1
+    setSession(updatedSession)
+    setCurrentQuestionIndex(nextIndex)
+    setAnswer(updatedSession.questions[nextIndex]?.answerText ?? '')
+    setStatusVariant('success')
+    setStatusMessage('답변이 저장되고 다음 질문으로 이동했습니다.')
+  }
+
+  async function handleAdvance() {
+    if (!session || !currentQuestion || !canAdvance) return
 
     setIsSubmitting(true)
     setStatusMessage('')
     setPageError('')
 
     try {
-      await interviewApi.saveAnswer(sessionId, {
-        questionId: currentQuestion.id,
-        answerText: answer.trim(),
-        audioUrl: null,
-      })
-      const updatedSession = await interviewApi.getSession(sessionId)
-      setSession(updatedSession)
-      setAnswer(updatedSession.questions[currentQuestionIndex]?.answerText ?? answer.trim())
-      setStatusVariant('success')
-      setStatusMessage('답변이 저장되었습니다.')
+      let updatedSession = session
+      const needsSave = Boolean(normalizedAnswer) && normalizedAnswer !== existingAnswer
+
+      if (needsSave) {
+        await interviewApi.saveAnswer(sessionId, {
+          questionId: currentQuestion.id,
+          answerText: normalizedAnswer,
+          audioUrl: null,
+        })
+        updatedSession = await interviewApi.getSession(sessionId)
+      }
+
+      if (isLastQuestion) {
+        try {
+          await interviewApi.endSession(sessionId)
+        } catch {
+        }
+        navigate(`/interview/result?sessionId=${sessionId}`)
+        return
+      }
+
+      moveToNextQuestion(updatedSession)
     } catch (error) {
       setPageError(error.message)
     } finally {
@@ -86,26 +119,7 @@ function InterviewSessionPage() {
 
   function handleVoicePlaceholder() {
     setStatusVariant('success')
-    setStatusMessage('음성 녹음 기능은 현재 텍스트 답변 흐름에 맞춰 순차적으로 연결 중입니다.')
-  }
-
-  async function handleNextQuestion() {
-    if (!session) return
-
-    const isLastQuestion = currentQuestionIndex >= session.questions.length - 1
-    if (isLastQuestion) {
-      try {
-        await interviewApi.endSession(sessionId)
-      } catch {
-      }
-      navigate(`/interview/result?sessionId=${sessionId}`)
-      return
-    }
-
-    const nextIndex = currentQuestionIndex + 1
-    setCurrentQuestionIndex(nextIndex)
-    setAnswer(session.questions[nextIndex]?.answerText ?? '')
-    setStatusMessage('')
+    setStatusMessage('음성 녹음 기능은 현재 텍스트 답변 흐름과 맞춰 순차적으로 연결 중입니다.')
   }
 
   if (isLoading) {
@@ -125,9 +139,7 @@ function InterviewSessionPage() {
           <p className="page-card__description">면접 설정 화면에서 새 세션을 시작해 주세요.</p>
         </div>
         <div className="button-row">
-          <button className="button" type="button" onClick={() => navigate('/interview/setup')}>
-            {BUTTON_LABELS.goToSetup}
-          </button>
+          <button className="button" type="button" onClick={() => navigate('/interview/setup')}>{BUTTON_LABELS.goToSetup}</button>
         </div>
       </section>
     )
@@ -138,32 +150,30 @@ function InterviewSessionPage() {
       <div className="workspace-page__hero">
         <p className="page-card__eyebrow">면접 진행</p>
         <h2 className="page-card__title">질문에 답변하고 다음 질문으로 차근차근 진행해 보세요.</h2>
-        <p className="page-card__description">
-          완료율 {session?.completionRate ?? 0}% · 답변 {session?.answeredQuestions ?? 0}/{session?.totalQuestions ?? 0}
-        </p>
+        <p className="page-card__description">모드: {modeLabel} · 완료율 {session?.completionRate ?? 0}% · 답변 {session?.answeredQuestions ?? 0}/{session?.totalQuestions ?? 0}</p>
       </div>
 
       <StatusMessage variant="error" message={session ? pageError : ''} />
       <StatusMessage variant={statusVariant} message={statusMessage} />
 
       <div className="workspace-page">
-        <QuestionCard question={currentQuestion} index={currentQuestionIndex} total={session.questions.length} mode={session.positionTitle} />
+        <QuestionCard question={currentQuestion} index={currentQuestionIndex} total={session.questions.length} mode={modeLabel} />
         <AnswerInput
           answer={answer}
           onChange={setAnswer}
-          onSubmit={handleSubmitAnswer}
+          onSubmit={handleAdvance}
           onRecordPlaceholder={handleVoicePlaceholder}
           isSubmitting={isSubmitting}
+          submitLabel={isLastQuestion ? BUTTON_LABELS.viewResult : BUTTON_LABELS.nextQuestion}
+          isSubmitDisabled={!canAdvance}
         />
         <FeedbackCard
           feedback={feedbackMessage}
           title="현재 피드백"
-          description="저장된 답변을 기준으로 현재까지의 개선 방향을 보여 줍니다."
+          description="저장된 답변을 기준으로 지금까지의 개선 방향을 보여드립니다."
         />
         <div className="button-row">
-          <button className="button" type="button" onClick={handleNextQuestion}>
-            {currentQuestionIndex >= session.questions.length - 1 ? BUTTON_LABELS.viewResult : BUTTON_LABELS.nextQuestion}
-          </button>
+          <button className="button button--secondary" type="button" onClick={() => navigate('/dashboard')}>{BUTTON_LABELS.goToDashboard}</button>
         </div>
       </div>
     </section>
