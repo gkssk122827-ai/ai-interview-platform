@@ -4,7 +4,6 @@ import EmptyState from '../components/common/EmptyState.jsx'
 import StatusMessage from '../components/common/StatusMessage.jsx'
 import TextAreaField from '../components/forms/TextAreaField.jsx'
 import learningApi from '../api/learningApi.js'
-import { BUTTON_LABELS, EMPTY_MESSAGES, STATUS_MESSAGES } from '../constants/messages.js'
 import usePageTitle from '../hooks/usePageTitle.js'
 
 function LearningSessionPage() {
@@ -24,19 +23,32 @@ function LearningSessionPage() {
   const answerValue = useMemo(() => (currentProblem?.type === 'MULTIPLE' ? selectedChoice : shortAnswer), [currentProblem?.type, selectedChoice, shortAnswer])
 
   if (!currentProblem && !isFinished) {
-    return <section className="workspace-page"><EmptyState title={EMPTY_MESSAGES.learningProblems.title} description={EMPTY_MESSAGES.learningProblems.description} action={<button className="button" type="button" onClick={() => navigate('/learning')}>{BUTTON_LABELS.goToSetup}</button>} /></section>
+    return (
+      <section className="workspace-page">
+        <EmptyState
+          title="생성된 학습 문제가 없습니다."
+          description="학습 설정으로 돌아가 과목과 난이도를 다시 선택해 주세요."
+          action={<button className="button" type="button" onClick={() => navigate('/learning')}>설정 화면으로 이동</button>}
+        />
+      </section>
+    )
   }
 
   async function handleSubmit() {
     if (!currentProblem || !answerValue.trim()) {
-      setError('답변을 입력하거나 선택해 주세요.')
+      setError('답변을 입력하거나 보기를 선택해 주세요.')
       return
     }
 
     setError('')
     setIsSubmitting(true)
     try {
-      const result = await learningApi.grade({ question: currentProblem.question, correctAnswer: currentProblem.answer, userAnswer: answerValue, explanation: currentProblem.explanation })
+      const result = await learningApi.grade({
+        question: currentProblem.question,
+        correctAnswer: currentProblem.answer,
+        userAnswer: answerValue,
+        explanation: currentProblem.explanation,
+      })
       setFeedback(result)
       setSubmittedCount((countValue) => countValue + 1)
     } catch (gradeError) {
@@ -67,7 +79,7 @@ function LearningSessionPage() {
           <h2 className="page-card__title">학습을 완료했습니다.</h2>
           <p className="page-card__description">총 {submittedCount}문제를 제출했습니다.</p>
         </div>
-        <div className="button-row"><button className="button" type="button" onClick={() => navigate('/learning')}>{BUTTON_LABELS.startLearning}</button></div>
+        <div className="button-row"><button className="button" type="button" onClick={() => navigate('/learning')}>학습 시작</button></div>
       </section>
     )
   }
@@ -89,7 +101,7 @@ function LearningSessionPage() {
           ? <div className="resource-list">{currentProblem.choices.map((choice) => <button key={choice} type="button" className={choice === selectedChoice ? 'resource-list__item resource-list__item--active' : 'resource-list__item'} onClick={() => setSelectedChoice(choice)}><strong>{choice}</strong></button>)}</div>
           : <TextAreaField label="답안" rows={6} value={shortAnswer} onChange={(event) => setShortAnswer(event.target.value)} placeholder="정답을 입력해 주세요." />}
 
-        <div className="button-row"><button className="button" type="button" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? STATUS_MESSAGES.loadingLearningResult : '제출'}</button>{feedback ? <button className="button button--secondary" type="button" onClick={handleNext}>{currentIndex >= problems.length - 1 ? '학습 종료' : '다음 문제'}</button> : null}</div>
+        <div className="button-row"><button className="button" type="button" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? '채점 결과를 불러오는 중입니다.' : '제출'}</button>{feedback ? <button className="button button--secondary" type="button" onClick={handleNext}>{currentIndex >= problems.length - 1 ? '학습 종료' : '다음 문제'}</button> : null}</div>
       </article>
 
       {feedback ? <article className="panel"><div className="panel__header"><div><h3 className="panel__title">채점 결과</h3></div></div><p className="panel__subtitle">{feedback.isCorrect ? '정답입니다.' : '오답입니다.'}</p><p className="panel__subtitle">{feedback.aiFeedback}</p></article> : null}

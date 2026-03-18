@@ -85,15 +85,20 @@ public class MockAiService implements AiService {
     @Override
     public List<ProblemDto> generateLearningProblems(String subject, String difficulty, int count, String type) {
         int problemCount = Math.max(1, count);
+        List<MockLearningTemplateCatalog.Template> templatePool = MockLearningTemplateCatalog.select(subject, difficulty);
         List<ProblemDto> problems = new ArrayList<>();
         for (int index = 1; index <= problemCount; index++) {
-            boolean multiple = !"SHORT".equalsIgnoreCase(type) && ("MULTIPLE".equalsIgnoreCase(type) || "MIX".equalsIgnoreCase(type) ? index % 2 == 1 : true);
+            boolean multiple = !"SHORT".equalsIgnoreCase(type)
+                    && ("MULTIPLE".equalsIgnoreCase(type) || "MIX".equalsIgnoreCase(type)
+                    ? index % 2 == 1
+                    : true);
+            MockLearningTemplateCatalog.Template template = templatePool.get((index - 1) % templatePool.size());
             problems.add(new ProblemDto(
                     multiple ? "MULTIPLE" : "SHORT",
-                    subject + " 학습 문제 " + index,
-                    multiple ? List.of("보기 A", "보기 B", "보기 C", "보기 D") : null,
-                    multiple ? "보기 A" : "예시 정답 " + index,
-                    difficulty + " 난이도 기준 해설입니다."
+                    template.question(),
+                    multiple ? template.choices() : null,
+                    multiple ? template.answer() : template.shortAnswer(),
+                    template.explanation()
             ));
         }
         return problems;
@@ -101,13 +106,26 @@ public class MockAiService implements AiService {
 
     @Override
     public GradeResultDto gradeLearningAnswer(String question, String correctAnswer, String userAnswer, String explanation) {
-        boolean correct = correctAnswer != null && correctAnswer.equalsIgnoreCase(userAnswer == null ? "" : userAnswer.trim());
-        return new GradeResultDto(
-                correct,
-                correct
-                        ? "정답입니다. 핵심 개념을 정확하게 이해하고 있습니다."
-                        : "오답입니다. 해설을 다시 읽고 핵심 개념을 정리해 보세요."
-        );
+        String normalizedUserAnswer = userAnswer == null ? "" : userAnswer.trim();
+        boolean correct = correctAnswer != null && correctAnswer.equalsIgnoreCase(normalizedUserAnswer);
+
+        if (correct) {
+            String feedback = StringUtils.hasText(explanation)
+                    ? "정답입니다. " + explanation
+                    : "정답입니다. 핵심 개념을 정확하게 이해하고 있습니다.";
+            return new GradeResultDto(true, feedback);
+        }
+
+        String wrongExplanation = MockLearningTemplateCatalog.findWrongExplanation(question, normalizedUserAnswer);
+        String correctExplanation = StringUtils.hasText(explanation)
+                ? explanation
+                : "해설을 다시 읽고 정답 근거를 확인해 보세요.";
+
+        String feedback = StringUtils.hasText(wrongExplanation)
+                ? "오답입니다. " + wrongExplanation + " 정답 근거: " + correctExplanation
+                : "오답입니다. 정답 근거: " + correctExplanation;
+
+        return new GradeResultDto(false, feedback);
     }
 
     private String buildWeakPointsMessage(int answeredCount, int averageLength, int structureHits, int metricHits) {
