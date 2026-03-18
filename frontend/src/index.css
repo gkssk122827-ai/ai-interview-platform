@@ -71,6 +71,25 @@ select {
   font: inherit;
 }
 
+.text-title,
+.text-body,
+.text-description,
+.text-label {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.text-title {
+  line-height: 1.45;
+}
+
+.text-body,
+.text-description,
+.text-label {
+  line-height: 1.6;
+}
+
 button {
   border: 0;
 }
@@ -109,6 +128,10 @@ button {
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--color-text);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.35;
 }
 
 .app-header__title {
@@ -135,6 +158,10 @@ button {
 .page-card__description {
   margin: 12px 0 0;
   max-width: 760px;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.65;
 }
 
 .app-nav {
@@ -150,6 +177,11 @@ button {
   background: rgba(255, 255, 255, 0.92);
   color: var(--color-text-muted);
   font-weight: 600;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+  text-align: center;
   transition: all 180ms ease;
 }
 
@@ -242,6 +274,48 @@ button {
   gap: 24px;
 }
 
+.admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.admin-overview-grid,
+.admin-list-stack {
+  display: grid;
+  gap: 24px;
+}
+
+.admin-overview-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-summary-card {
+  min-width: 0;
+  gap: 14px;
+}
+
+.admin-summary-card__label {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.admin-summary-card__value {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.admin-chart-panel,
+.admin-job-posting-panel,
+.admin-list-panel {
+  min-width: 0;
+}
+
 .page-card__title {
   font-size: clamp(1.8rem, 3vw, 2.5rem);
   line-height: 1.2;
@@ -265,6 +339,10 @@ button {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--color-text);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.45;
 }
 
 .panel__subtitle,
@@ -279,15 +357,25 @@ button {
 .feedback-card p {
   margin: 4px 0 0;
   font-size: 0.95rem;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.62;
 }
 
 .resource-list,
 .page-card__list,
 .dashboard-session-list,
-.dashboard-action-list,
-.result-question-list {
+.dashboard-action-list {
   display: grid;
   gap: 14px;
+}
+
+.result-question-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
 }
 
 .resource-list__item,
@@ -307,14 +395,74 @@ button {
   background: var(--color-surface-muted);
 }
 
+.result-question-item {
+  display: grid;
+  align-content: start;
+  min-height: 220px;
+}
+
 .resource-list__item {
   text-align: left;
   cursor: pointer;
+  min-width: 0;
+}
+
+.resource-list__item strong,
+.dashboard-session-item strong,
+.dashboard-action-item strong,
+.empty-card h4,
+.status-block strong,
+.status-message,
+.score-chip,
+.dashboard-tag,
+.dashboard-score-chip,
+.interview-badge {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.resource-list__item strong,
+.dashboard-session-item strong,
+.dashboard-action-item strong,
+.status-block strong {
+  line-height: 1.45;
+}
+
+.resource-list__item--static {
+  cursor: default;
+}
+
+.resource-list__item--static:hover {
+  box-shadow: var(--shadow-soft);
+  border-color: var(--color-border);
+  transform: none;
 }
 
 .resource-list__item--active {
   border-color: rgba(37, 99, 235, 0.22);
   background: linear-gradient(180deg, rgba(37, 99, 235, 0.08), rgba(255, 255, 255, 0.96));
+}
+
+.admin-list-panel .panel__header {
+  align-items: stretch;
+  min-height: 64px;
+}
+
+.admin-list-panel .resource-list {
+  gap: 12px;
+}
+
+.admin-list-panel .resource-list__item {
+  min-height: 96px;
+  align-content: start;
+  gap: 6px;
+}
+
+.admin-list-panel .resource-list__item strong,
+.admin-list-panel .resource-list__item span {
+  overflow-wrap: break-word;
+  word-break: keep-all;
 }
 
 .editor-form {
@@ -333,6 +481,10 @@ button {
   font-size: 0.94rem;
   font-weight: 700;
   color: var(--color-text);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.5;
 }
 
 .form-field__hint,
@@ -412,6 +564,11 @@ button {
   color: #fff;
   font-weight: 700;
   cursor: pointer;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+  text-align: center;
   transition: all 180ms ease;
 }
 
@@ -461,6 +618,10 @@ button {
 .status-block,
 .empty-card {
   font-size: 0.95rem;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.6;
 }
 
 .status-message--success,
@@ -520,6 +681,10 @@ button {
 .result-question-item__question,
 .dashboard-action-item p {
   color: var(--color-text-muted);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.62;
 }
 
 .interview-question-card__prompt,
@@ -527,7 +692,10 @@ button {
   margin: 8px 0 0;
   font-size: 1.12rem;
   font-weight: 700;
-  line-height: 1.75;
+  line-height: 1.65;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .interview-question-card__intent {
@@ -554,6 +722,12 @@ button {
 
 .dashboard-recent-card {
   grid-column: 2 / 3;
+  grid-row: 2;
+}
+
+.dashboard-recommend-card {
+  grid-column: 1 / 2;
+  grid-row: 2;
 }
 
 .dashboard-chart {
@@ -593,6 +767,14 @@ button {
   margin-top: 10px;
 }
 
+.result-question-item__header strong {
+  display: block;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.5;
+}
+
 .page-card__panel {
   display: grid;
   gap: 12px;
@@ -610,9 +792,21 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .admin-summary-grid,
+  .admin-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-chart-card,
-  .dashboard-recent-card {
+  .dashboard-recent-card,
+  .dashboard-recommend-card {
     grid-column: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-summary-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -645,4 +839,13 @@ button {
     flex-direction: column;
     align-items: stretch;
   }
+
+  .result-question-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.result-summary-panel {
+  grid-column: 1 / -1;
+  width: 100%;
 }

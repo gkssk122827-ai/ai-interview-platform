@@ -51,12 +51,13 @@ function InterviewResultPage() {
     <section className="workspace-page">
       <div className="workspace-page__hero">
         <p className="page-card__eyebrow">면접 결과</p>
-        <h2 className="page-card__title">모의면접이 완료되었습니다. 결과를 확인해 보세요.</h2>
-        <p className="page-card__description">세션 종료 후 저장된 답변과 피드백을 바탕으로 결과를 표시합니다.</p>
+        <h2 className="page-card__title">모의면접이 끝났습니다. 결과를 확인해 보세요.</h2>
+        <p className="page-card__description">저장된 답변과 피드백을 기준으로 결과를 요약해 보여드립니다.</p>
       </div>
       <ResultSummary result={result} />
       <div className="button-row">
-        <button className="button" type="button" onClick={() => navigate('/interview/setup')}>{BUTTON_LABELS.startInterview}</button>
+        <button className="button" type="button" onClick={() => navigate('/dashboard')}>대시보드로 이동</button>
+        <button className="button button--secondary" type="button" onClick={() => navigate('/interview/setup')}>{BUTTON_LABELS.startInterview}</button>
         <button className="button button--secondary" type="button" onClick={() => navigate('/learning')}>{BUTTON_LABELS.startLearning}</button>
       </div>
     </section>

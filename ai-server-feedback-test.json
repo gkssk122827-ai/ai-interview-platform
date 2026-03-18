@@ -1,0 +1,8 @@
+{
+  "conversationHistory": [
+    {
+      "question": "REST API와 RESTful API의 차이는 무엇인가요?",
+      "answer": "REST는 자원 중심 설계이고 실제 프로젝트에서는 URI와 HTTP 메서드를 일관되게 설계했습니다. 응답 속도를 20% 개선했습니다."
+    }
+  ]
+}

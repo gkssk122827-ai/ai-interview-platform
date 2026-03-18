@@ -1,5 +1,6 @@
-﻿import BaseLayout from '../components/layout/BaseLayout.jsx'
+import BaseLayout from '../components/layout/BaseLayout.jsx'
 import AdminPage from '../pages/AdminPage.jsx'
+import AdminJobPostingEditorPage from '../pages/AdminJobPostingEditorPage.jsx'
 import ApplicationDocumentPage from '../pages/ApplicationDocumentPage.jsx'
 import BookStorePage from '../pages/BookStorePage.jsx'
 import CartPage from '../pages/CartPage.jsx'
@@ -8,6 +9,7 @@ import DashboardPage from '../pages/DashboardPage.jsx'
 import InterviewResultPage from '../pages/InterviewResultPage.jsx'
 import InterviewSessionPage from '../pages/InterviewSessionPage.jsx'
 import InterviewSetupPage from '../pages/InterviewSetupPage.jsx'
+import JobPostingDetailPage from '../pages/JobPostingDetailPage.jsx'
 import JobPostingPage from '../pages/JobPostingPage.jsx'
 import LearningPage from '../pages/LearningPage.jsx'
 import LearningSessionPage from '../pages/LearningSessionPage.jsx'
@@ -41,6 +43,8 @@ const routes = [
           { path: 'profile-documents', element: <ApplicationDocumentPage /> },
           { path: 'resume', element: <ResumePage /> },
           { path: 'cover-letter', element: <CoverLetterPage /> },
+          { path: 'job-posting', element: <JobPostingPage /> },
+          { path: 'job-posting/:jobPostingId', element: <JobPostingDetailPage /> },
           { path: 'interview/setup', element: <InterviewSetupPage /> },
           { path: 'interview/session', element: <InterviewSessionPage /> },
           { path: 'interview/result', element: <InterviewResultPage /> },
@@ -53,7 +57,8 @@ const routes = [
             element: <RoleRoute allowedRoles={['ADMIN']} />,
             children: [
               { path: 'admin', element: <AdminPage /> },
-              { path: 'job-posting', element: <JobPostingPage /> },
+              { path: 'admin/job-postings/new', element: <AdminJobPostingEditorPage /> },
+              { path: 'admin/job-postings/:jobPostingId/edit', element: <AdminJobPostingEditorPage /> },
             ],
           },
         ],

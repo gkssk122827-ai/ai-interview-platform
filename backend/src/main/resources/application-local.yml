@@ -7,3 +7,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+
+ai:
+  server:
+    url: ${AI_SERVER_URL:http://localhost:8000}
+
+integration:
+  ai:
+    provider: ${AI_PROVIDER:python}

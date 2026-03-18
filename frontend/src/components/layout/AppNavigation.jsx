@@ -1,4 +1,4 @@
-﻿import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import authApi from '../../api/authApi.js'
 import { BUTTON_LABELS, NAV_TEXT } from '../../constants/messages.js'
 import useAuthStore from '../../store/authStore.js'
@@ -8,12 +8,12 @@ const navigationItems = [
   { to: '/auth/register', label: NAV_TEXT.register, requiresAuth: false },
   { to: '/dashboard', label: NAV_TEXT.dashboard, requiresAuth: true },
   { to: '/profile-documents', label: NAV_TEXT.documents, requiresAuth: true },
+  { to: '/job-posting', label: NAV_TEXT.jobPosting, requiresAuth: true },
   { to: '/interview/setup', label: NAV_TEXT.interview, requiresAuth: true },
   { to: '/learning', label: NAV_TEXT.learning, requiresAuth: true },
   { to: '/books', label: NAV_TEXT.books, requiresAuth: true },
   { to: '/cart', label: NAV_TEXT.cart, requiresAuth: true },
   { to: '/orders', label: NAV_TEXT.orders, requiresAuth: true },
-  { to: '/job-posting', label: NAV_TEXT.jobPosting, requiresAuth: true, roles: ['ADMIN'] },
   { to: '/admin', label: NAV_TEXT.admin, requiresAuth: true, roles: ['ADMIN'] },
 ]
 

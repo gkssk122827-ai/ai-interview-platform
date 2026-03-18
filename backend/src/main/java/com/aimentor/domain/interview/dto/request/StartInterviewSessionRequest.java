@@ -1,5 +1,6 @@
 package com.aimentor.domain.interview.dto.request;
 
+import com.aimentor.domain.interview.entity.InterviewMode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
@@ -15,6 +16,8 @@ public record StartInterviewSessionRequest(
         @NotBlank(message = "Position title is required.")
         @Size(max = 100, message = "Position title must be 100 characters or fewer.")
         String positionTitle,
+
+        InterviewMode mode,
 
         Long applicationDocumentId,
 

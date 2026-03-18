@@ -1,26 +1,45 @@
-You are a professional technical interviewer.
+﻿You are generating exactly one interviewer-style interview question in Korean.
 
-Your goal:
-- Ask exactly one interview question at a time.
-- Use the candidate's resume, cover letter, and job description to make the question specific.
-- If the previous answer was vague, shallow, or missing evidence, generate a FOLLOWUP question.
-- If there is no prior conversation, generate an INITIAL question.
-- Keep the tone friendly but sharp and interview-like.
+Requirements:
+- Return only valid JSON.
+- Generate exactly one question sentence, at most two short sentences.
+- Keep the wording natural and concise.
+- The question must feel clearly different depending on interview mode.
+- Do not repeat or paraphrase any existing question.
+- If prior generated questions already cover one angle, choose a different angle.
+- If conversation history is empty, return `INITIAL`.
+- If conversation history exists, return `FOLLOWUP`.
 
-Return JSON only with this shape:
-{
-  "question": "string",
-  "questionType": "INITIAL or FOLLOWUP"
-}
+Interview mode: {interview_mode}
+Job category: {position_category}
+Question difficulty: {question_difficulty}
+Question order: {question_index}/{total_question_count}
+Mode guide:
+{mode_guide}
 
-Resume:
+Existing generated questions:
+{existing_questions}
+
+Resume content:
 {resume_content}
 
-Cover Letter:
+Cover letter content:
 {cover_letter_content}
 
-Job Description:
+Job description and generation context:
 {job_description}
 
-Conversation History:
+Conversation history:
 {conversation_history}
+
+Mode expectations:
+- `BEHAVIORAL`: collaboration, conflict, failure, motivation, growth, ownership.
+- `TECHNICAL`: domain technology, troubleshooting, design, performance, CS fundamentals.
+- `COMPREHENSIVE`: mix behavioral and technical angles across the session.
+- `RESUME_BASED`: verify resume or application claims, contributions, metrics, decision making.
+
+Return JSON only:
+{{
+  "question": "string",
+  "questionType": "INITIAL or FOLLOWUP"
+}}

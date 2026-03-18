@@ -2,6 +2,7 @@ package com.aimentor.external.ai;
 
 import com.aimentor.external.ai.dto.FeedbackDto;
 import com.aimentor.external.ai.dto.GradeResultDto;
+import com.aimentor.external.ai.dto.InterviewQuestionGenerationContext;
 import com.aimentor.external.ai.dto.ProblemDto;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,13 +33,26 @@ public class PythonAiService implements AiService {
             String resumeContent,
             String coverLetterContent,
             String jobDescription,
+            InterviewQuestionGenerationContext context,
             List<ConversationTurnDto> history
     ) {
         try {
             ResponseEntity<InterviewQuestionResponse> response = restTemplate.exchange(
                     aiServerProperties.url() + "/interview/question",
                     HttpMethod.POST,
-                    new HttpEntity<>(new InterviewQuestionRequest(resumeContent, coverLetterContent, jobDescription, history)),
+                    new HttpEntity<>(new InterviewQuestionRequest(
+                            resumeContent,
+                            coverLetterContent,
+                            jobDescription,
+                            context.interviewMode(),
+                            context.positionCategory(),
+                            context.questionDifficulty(),
+                            context.questionIndex(),
+                            context.totalQuestionCount(),
+                            context.modeGuide(),
+                            context.existingQuestions(),
+                            history
+                    )),
                     InterviewQuestionResponse.class
             );
             return response.getBody() == null ? null : response.getBody().question();
@@ -100,6 +114,13 @@ public class PythonAiService implements AiService {
             String resumeContent,
             String coverLetterContent,
             String jobDescription,
+            String interviewMode,
+            String positionCategory,
+            String questionDifficulty,
+            int questionIndex,
+            int totalQuestionCount,
+            String modeGuide,
+            List<String> existingQuestions,
             List<ConversationTurnDto> conversationHistory
     ) {
     }

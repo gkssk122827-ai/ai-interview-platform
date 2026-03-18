@@ -14,11 +14,11 @@ export const BUTTON_LABELS = {
   goToSetup: '설정 화면으로 이동',
   goToDashboard: '대시보드로 이동',
   prepareRecording: '녹음 준비',
-  submitAnswer: '답변 제출',
+  submitAnswer: '답변 저장',
   nextQuestion: '다음 질문',
   viewResult: '결과 보기',
   addToCart: '장바구니 담기',
-  orderNow: '주문하기',
+  orderNow: '바로 주문',
 }
 
 export const STATUS_MESSAGES = {
@@ -29,7 +29,7 @@ export const STATUS_MESSAGES = {
   generatingInterviewQuestions: 'AI 면접 질문을 준비하는 중입니다.',
   loadingInterviewSession: '면접 세션을 불러오는 중입니다.',
   loadingInterviewResult: '면접 결과를 불러오는 중입니다.',
-  loadingLearningResult: '채점 결과를 확인하는 중입니다.',
+  loadingLearningResult: '채점 결과를 불러오는 중입니다.',
   loadingBooks: '도서를 불러오는 중입니다.',
   loadingCart: '장바구니를 불러오는 중입니다.',
   loadingOrders: '주문 내역을 불러오는 중입니다.',
@@ -51,7 +51,7 @@ export const ERROR_MESSAGES = {
   notFound: '요청한 정보를 찾을 수 없습니다.',
   server: '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
   sessionExpired: '세션이 만료되었습니다. 다시 로그인해 주세요.',
-  missingRefreshToken: '재발급 토큰을 확인해 주세요.',
+  missingRefreshToken: '로그인 정보를 다시 확인해 주세요.',
   loadList: '목록을 불러오는 중 오류가 발생했습니다.',
   saveItem: '저장하는 중 오류가 발생했습니다.',
   deleteItem: '삭제하는 중 오류가 발생했습니다.',
@@ -69,7 +69,7 @@ export const NAV_TEXT = {
   register: '회원가입',
   dashboard: '대시보드',
   documents: '지원자료',
-  jobPosting: '채용공고 관리',
+  jobPosting: '채용공고',
   interview: '모의면접',
   learning: '학습',
   books: '도서',
@@ -84,7 +84,7 @@ export const COMMON_TEXT = {
   total: '전체',
   errorTitle: '오류',
   emptyTitle: '표시할 내용이 없습니다.',
-  sessionNoticeTitle: '로그인이 필요합니다.',
+  sessionNoticeTitle: '안내',
   noFile: '첨부된 파일이 없습니다.',
   attachedFile: '첨부 파일',
   savedFile: '저장된 파일',
@@ -101,7 +101,7 @@ export const EMPTY_MESSAGES = {
   },
   interviewJobPostings: {
     title: '등록된 채용공고가 없습니다.',
-    description: '채용공고 없이도 면접은 시작할 수 있지만, 선택 가능한 공고가 있으면 더 구체적인 연습이 가능합니다.',
+    description: '채용공고 없이도 면접은 시작할 수 있지만, 공고를 선택하면 더 구체적인 질문으로 연습할 수 있습니다.',
   },
   books: {
     title: '표시할 도서가 없습니다.',
@@ -109,23 +109,23 @@ export const EMPTY_MESSAGES = {
   },
   cart: {
     title: '장바구니가 비어 있습니다.',
-    description: '도서 스토어에서 필요한 도서를 담아 보세요.',
+    description: '도서 목록에서 필요한 도서를 담아 보세요.',
   },
   orders: {
     title: '주문 내역이 없습니다.',
-    description: '도서를 주문하면 여기에서 상태와 상세 항목을 확인할 수 있습니다.',
+    description: '도서를 주문하면 여기에서 상태와 상세 내역을 확인할 수 있습니다.',
   },
   learningProblems: {
     title: '생성된 학습 문제가 없습니다.',
     description: '학습 설정으로 돌아가 과목과 난이도를 다시 선택해 주세요.',
   },
   adminDailySignups: {
-    title: '표시할 가입자 통계가 없습니다.',
-    description: '회원 데이터가 쌓이면 일별 가입자 수를 차트로 보여 드립니다.',
+    title: '표시할 가입 통계가 없습니다.',
+    description: '회원 데이터가 쌓이면 최근 가입 추이를 차트로 보여드립니다.',
   },
   adminRecentUsers: {
-    title: '최근 가입 사용자가 없습니다.',
-    description: '가입 데이터가 쌓이면 최근 사용자 정보를 확인할 수 있습니다.',
+    title: '최근 가입한 사용자가 없습니다.',
+    description: '사용자 데이터가 쌓이면 이 영역에서 최근 가입 사용자를 확인할 수 있습니다.',
   },
   adminRecentDocuments: {
     title: '최근 지원자료가 없습니다.',
@@ -133,6 +133,6 @@ export const EMPTY_MESSAGES = {
   },
   adminRecentSessions: {
     title: '최근 면접 세션이 없습니다.',
-    description: '모의면접이 시작되면 최근 세션이 이 영역에 표시됩니다.',
+    description: '모의면접을 시작하면 이 영역에 최근 세션이 표시됩니다.',
   },
 }
