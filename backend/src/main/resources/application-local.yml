@@ -14,4 +14,6 @@ ai:
 
 integration:
   ai:
-    provider: ${AI_PROVIDER:mock-ai}
+    provider: ${AI_PROVIDER:python}
+  speech:
+    provider: ${SPEECH_PROVIDER:${AI_PROVIDER:python}}

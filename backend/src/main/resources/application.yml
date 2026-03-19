@@ -46,12 +46,12 @@ ai:
 
 integration:
   ai:
-    provider: ${AI_PROVIDER:mock-ai}
+    provider: ${AI_PROVIDER:python}
     api-key: ${AI_API_KEY:}
     base-url: ${AI_BASE_URL:}
     model: ${AI_MODEL:}
   speech:
-    provider: ${SPEECH_PROVIDER:mock-speech}
+    provider: ${SPEECH_PROVIDER:${AI_PROVIDER:python}}
     api-key: ${SPEECH_API_KEY:}
     base-url: ${SPEECH_BASE_URL:}
     voice: ${SPEECH_VOICE:}

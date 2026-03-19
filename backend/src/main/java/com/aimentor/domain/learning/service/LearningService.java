@@ -19,7 +19,7 @@ public class LearningService {
 
     public LearningGenerateResponse generateProblems(LearningGenerateRequest request) {
         return new LearningGenerateResponse(
-                aiService.generateLearningProblems(request.subject(), request.difficulty(), request.count(), request.type()).stream()
+                aiService.generateLearningProblems(request.subject(), request.difficulty(), request.count(), "MULTIPLE").stream()
                         .map(problem -> new LearningProblemResponse(
                                 problem.type(),
                                 problem.question(),

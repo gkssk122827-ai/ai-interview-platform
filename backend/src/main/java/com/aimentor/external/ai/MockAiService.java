@@ -9,7 +9,9 @@ import com.aimentor.external.ai.dto.GradeResultDto;
 import com.aimentor.external.ai.dto.InterviewQuestionGenerationContext;
 import com.aimentor.external.ai.dto.ProblemDto;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -86,18 +88,21 @@ public class MockAiService implements AiService {
     public List<ProblemDto> generateLearningProblems(String subject, String difficulty, int count, String type) {
         int problemCount = Math.max(1, count);
         List<MockLearningTemplateCatalog.Template> templatePool = MockLearningTemplateCatalog.select(subject, difficulty);
+        if (templatePool.isEmpty()) {
+            return List.of();
+        }
+
+        List<MockLearningTemplateCatalog.Template> shuffledTemplates = new ArrayList<>(templatePool);
+        Collections.shuffle(shuffledTemplates, ThreadLocalRandom.current());
+
         List<ProblemDto> problems = new ArrayList<>();
         for (int index = 1; index <= problemCount; index++) {
-            boolean multiple = !"SHORT".equalsIgnoreCase(type)
-                    && ("MULTIPLE".equalsIgnoreCase(type) || "MIX".equalsIgnoreCase(type)
-                    ? index % 2 == 1
-                    : true);
-            MockLearningTemplateCatalog.Template template = templatePool.get((index - 1) % templatePool.size());
+            MockLearningTemplateCatalog.Template template = shuffledTemplates.get((index - 1) % shuffledTemplates.size());
             problems.add(new ProblemDto(
-                    multiple ? "MULTIPLE" : "SHORT",
+                    "MULTIPLE",
                     template.question(),
-                    multiple ? template.choices() : null,
-                    multiple ? template.answer() : template.shortAnswer(),
+                    template.choices(),
+                    template.answer(),
                     template.explanation()
             ));
         }

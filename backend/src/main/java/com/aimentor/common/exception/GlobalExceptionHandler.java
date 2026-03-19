@@ -1,6 +1,7 @@
 package com.aimentor.common.exception;
 
 import com.aimentor.common.api.ApiResponse;
+import com.aimentor.domain.voice.exception.VoiceException;
 import com.aimentor.external.ai.AiServiceException;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -27,6 +28,20 @@ public class GlobalExceptionHandler {
         log.error("[GlobalException] ApiException occurred code={}, status={}, message={}", ex.getErrorCode(), ex.getHttpStatus(), ex.getMessage(), ex);
         return ResponseEntity.status(ex.getHttpStatus())
                 .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(VoiceException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVoiceException(VoiceException ex) {
+        log.error(
+                "[GlobalException] VoiceException occurred code={}, status={}, message={}, details={}",
+                ex.getErrorCode(),
+                ex.getHttpStatus(),
+                ex.getMessage(),
+                ex.getDetails(),
+                ex
+        );
+        return ResponseEntity.status(ex.getHttpStatus())
+                .body(ApiResponse.error(ex.getErrorCode(), ex.getMessage(), ex.getDetails()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

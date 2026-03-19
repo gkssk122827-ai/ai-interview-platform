@@ -9,7 +9,15 @@ function AnswerInput({
   isSubmitting,
   submitLabel = BUTTON_LABELS.nextQuestion,
   isSubmitDisabled = false,
+  isRecording = false,
+  isVoiceLoading = false,
+  voiceError = '',
+  isAutoPlayEnabled = true,
+  onToggleAutoPlay,
 }) {
+  const recordButtonLabel = isRecording ? '녹음 종료' : '마이크 녹음'
+  const recordButtonDisabled = isVoiceLoading || isSubmitting
+
   return (
     <article className="panel">
       <div className="panel__header">
@@ -28,9 +36,18 @@ function AnswerInput({
         />
       </div>
       <div className="button-row">
-        <button className="button button--secondary" type="button" onClick={onRecordPlaceholder}>{BUTTON_LABELS.prepareRecording}</button>
+        <button className="button button--secondary" type="button" onClick={onRecordPlaceholder} disabled={recordButtonDisabled}>
+          {isVoiceLoading ? '음성 처리 중...' : recordButtonLabel}
+        </button>
         <button className="button" type="button" onClick={onSubmit} disabled={isSubmitting || isSubmitDisabled}>{submitLabel}</button>
       </div>
+      <div className="panel__subtitle">
+        {isRecording ? '녹음 중입니다...' : '녹음 대기 중'}
+      </div>
+      {voiceError ? <div className="panel__subtitle">{voiceError}</div> : null}
+      <label className="panel__subtitle">
+        <input type="checkbox" checked={isAutoPlayEnabled} onChange={onToggleAutoPlay} /> 질문 음성 자동 재생
+      </label>
     </article>
   )
 }
