@@ -32,6 +32,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("io.jsonwebtoken:jjwt-api:0.12.7")
+    implementation("org.crac:crac:1.5.0")
+// 버전은 필요에 따라 조정
     compileOnly("org.projectlombok:lombok")
     runtimeOnly("org.mariadb.jdbc:mariadb-java-client")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.7")
