@@ -440,8 +440,13 @@ button {
 }
 
 .resource-list__item--active {
-  border-color: rgba(37, 99, 235, 0.22);
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.08), rgba(255, 255, 255, 0.96));
+  border-color: rgba(29, 78, 216, 0.5);
+  background: linear-gradient(180deg, rgba(29, 78, 216, 0.2), rgba(219, 234, 254, 0.72));
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2) inset;
+}
+
+.resource-list__item--active strong {
+  color: #1e3a8a;
 }
 
 .admin-list-panel .panel__header {

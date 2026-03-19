@@ -58,7 +58,8 @@ public class InterviewSessionService {
     private static final Logger log = LoggerFactory.getLogger(InterviewSessionService.class);
     private static final int DEFAULT_QUESTION_COUNT = 3;
     private static final int MAX_CONTEXT_LENGTH = 3000;
-    private static final int MAX_AI_GENERATION_RETRIES = 3;
+    private static final int MAX_AI_GENERATION_RETRIES = 5;
+    private static final double QUESTION_SIMILARITY_THRESHOLD = 0.75;
     private static final Set<String> QUESTION_STOP_WORDS = Set.of(
             "무엇", "설명", "주세요", "말해", "있다면", "있나요", "어떻게", "경험", "기술", "프로젝트", "기반", "지원서", "이력서", "직무"
     );
@@ -270,15 +271,33 @@ public class InterviewSessionService {
 
         for (int index = 1; index <= questionCount; index++) {
             InterviewQuestionDifficulty difficulty = InterviewQuestionCatalog.resolveDifficulty(index, questionCount);
-            String normalizedQuestionText = generateAiQuestionWithRetry(
-                    session,
-                    generatedQuestions,
-                    mode,
-                    category,
-                    difficulty,
-                    index,
-                    questionCount
-            );
+            String normalizedQuestionText;
+            try {
+                normalizedQuestionText = generateAiQuestionWithRetry(
+                        session,
+                        generatedQuestions,
+                        mode,
+                        category,
+                        difficulty,
+                        index,
+                        questionCount
+                );
+            } catch (RuntimeException ex) {
+                log.warn(
+                        "[Interview] Falling back to slot-level question template. sessionId={}, questionIndex={}",
+                        session.getId(),
+                        index,
+                        ex
+                );
+                normalizedQuestionText = buildFallbackQuestionText(
+                        session,
+                        generatedQuestions,
+                        index,
+                        mode,
+                        category,
+                        difficulty
+                );
+            }
 
             generatedQuestions.add(normalizedQuestionText);
             questions.add(InterviewQuestion.builder()
@@ -682,6 +701,7 @@ public class InterviewSessionService {
     private String buildJobGenerationInput(
             InterviewSession session,
             List<String> generatedQuestions,
+            List<String> rejectedQuestions,
             int questionIndex,
             int totalQuestionCount,
             InterviewMode mode,
@@ -700,6 +720,11 @@ public class InterviewSessionService {
         if (!generatedQuestions.isEmpty()) {
             appendLabeledSection(builder, "Already generated questions", String.join("\n", generatedQuestions));
             appendLabeledSection(builder, "Generation rule", "Do not repeat or paraphrase the already generated questions.");
+            appendLabeledSection(builder, "Avoid semantic overlap", "Each new question must test a different competency and context from prior questions.");
+        }
+        if (!rejectedQuestions.isEmpty()) {
+            appendLabeledSection(builder, "Rejected candidate questions", String.join("\n", rejectedQuestions));
+            appendLabeledSection(builder, "Retry rule", "Do not reuse or paraphrase any rejected candidate question.");
         }
         return limitText(builder.toString(), MAX_CONTEXT_LENGTH);
     }
@@ -714,6 +739,7 @@ public class InterviewSessionService {
             int totalQuestionCount
     ) {
         RuntimeException lastException = null;
+        List<String> rejectedQuestions = new ArrayList<>();
 
         for (int attempt = 1; attempt <= MAX_AI_GENERATION_RETRIES; attempt++) {
             try {
@@ -729,7 +755,7 @@ public class InterviewSessionService {
                 String questionText = aiService.generateInterviewQuestion(
                         buildResumeGenerationInput(session),
                         buildCoverLetterGenerationInput(session),
-                        buildJobGenerationInput(session, generatedQuestions, questionIndex, totalQuestionCount, mode, category, difficulty),
+                        buildJobGenerationInput(session, generatedQuestions, rejectedQuestions, questionIndex, totalQuestionCount, mode, category, difficulty),
                         context,
                         List.of()
                 );
@@ -739,11 +765,21 @@ public class InterviewSessionService {
 
                 String normalizedQuestionText = questionText.trim();
                 if (containsSimilarQuestion(generatedQuestions, normalizedQuestionText)) {
+                    rejectedQuestions.add(normalizedQuestionText);
                     throw new IllegalStateException("AI returned a duplicated or similar interview question.");
                 }
                 return normalizedQuestionText;
             } catch (RuntimeException ex) {
                 lastException = ex;
+                if (attempt < MAX_AI_GENERATION_RETRIES) {
+                    log.debug(
+                            "[Interview] Retrying AI question generation. sessionId={}, questionIndex={}, nextAttempt={}/{}",
+                            session.getId(),
+                            questionIndex,
+                            attempt + 1,
+                            MAX_AI_GENERATION_RETRIES
+                    );
+                }
             }
         }
 
@@ -834,7 +870,7 @@ public class InterviewSessionService {
         long intersection = leftTokens.stream().filter(rightTokens::contains).count();
         int union = leftTokens.size() + rightTokens.size() - (int) intersection;
         double similarity = union == 0 ? 0.0 : (double) intersection / union;
-        return similarity >= 0.6;
+        return similarity >= QUESTION_SIMILARITY_THRESHOLD;
     }
 
     private String normalizeQuestion(String questionText) {

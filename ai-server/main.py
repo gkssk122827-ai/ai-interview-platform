@@ -8,8 +8,10 @@ from fastapi.responses import JSONResponse
 from routers.interview import router as interview_router
 from routers.learning import router as learning_router
 from routers.stt import router as stt_router
+from routers.tts import router as tts_router
 from services.interview_service import InterviewService
 from services.learning_service import LearningService
+from services.tts_service import TextToSpeechService
 from services.whisper_service import WhisperService
 
 
@@ -30,11 +32,16 @@ async def lifespan(app: FastAPI):
         api_key=os.getenv("OPENAI_API_KEY"),
         model_name="gpt-4o",
     )
+    app.state.tts_service = TextToSpeechService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        model_name=os.getenv("TTS_MODEL_NAME", "gpt-4o-mini-tts"),
+    )
     yield
 
 
 app = FastAPI(title="AI Interview Platform AI Server", lifespan=lifespan)
 app.include_router(stt_router)
+app.include_router(tts_router)
 app.include_router(interview_router)
 app.include_router(learning_router)
 

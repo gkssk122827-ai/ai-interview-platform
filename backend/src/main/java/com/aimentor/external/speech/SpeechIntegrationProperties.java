@@ -7,6 +7,8 @@ public record SpeechIntegrationProperties(
         String provider,
         String apiKey,
         String baseUrl,
-        String voice
+        String voice,
+        Integer connectTimeoutMs,
+        Integer readTimeoutMs
 ) {
 }

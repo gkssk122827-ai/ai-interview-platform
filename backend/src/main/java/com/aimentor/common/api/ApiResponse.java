@@ -24,7 +24,11 @@ public class ApiResponse<T> {
     }
 
     public static ApiResponse<Void> error(String code, String message) {
-        return new ApiResponse<>(false, null, new ErrorBody(code, message));
+        return new ApiResponse<>(false, null, new ErrorBody(code, message, null));
+    }
+
+    public static ApiResponse<Void> error(String code, String message, Object details) {
+        return new ApiResponse<>(false, null, new ErrorBody(code, message, details));
     }
 
     /**
@@ -35,5 +39,6 @@ public class ApiResponse<T> {
     public static class ErrorBody {
         private final String code;
         private final String message;
+        private final Object details;
     }
 }
