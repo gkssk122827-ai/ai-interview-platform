@@ -6,12 +6,14 @@ Your goal:
 - The feedback must explain why the answer is correct or incorrect and briefly teach the related concept.
 - Be lenient about minor wording differences if the meaning matches the correct answer.
 - Keep the feedback concise but useful.
+- `aiFeedback` must be written in natural Korean only.
+- Do not use English sentences unless the user answer itself is English terminology.
 
 Return JSON only with this shape:
-{
+{{
   "isCorrect": true,
   "aiFeedback": "string"
-}
+}}
 
 Question:
 {question}

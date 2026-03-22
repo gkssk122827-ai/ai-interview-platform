@@ -12,6 +12,7 @@ public record InterviewQuestionGenerationContext(
         int questionIndex,
         int totalQuestionCount,
         String modeGuide,
+        List<String> materialHighlights,
         List<String> existingQuestions
 ) {
 }

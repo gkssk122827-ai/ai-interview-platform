@@ -9,27 +9,27 @@ import org.springframework.util.StringUtils;
 final class MockLearningTemplateCatalog {
 
     private static final String[] LETTERS = {"A", "B", "C", "D", "E"};
-    private static final String SUBJECT_FRONTEND = "\uD504\uB860\uD2B8\uC5D4\uB4DC";
-    private static final String SUBJECT_BACKEND = "\uBC31\uC5D4\uB4DC";
-    private static final String SUBJECT_FULLSTACK = "\uD480\uC2A4\uD0DD";
-    private static final String SUBJECT_DATABASE = "\uB370\uC774\uD130\uBCA0\uC774\uC2A4";
+    private static final String SUBJECT_FRONTEND = "프론트엔드";
+    private static final String SUBJECT_BACKEND = "백엔드";
+    private static final String SUBJECT_FULLSTACK = "풀스택";
+    private static final String SUBJECT_DATABASE = "데이터베이스";
 
     private static final String[] EASY_PROMPTS = {
-            "%s\uC758 \uAE30\uBCF8 \uAC1C\uB150\uC73C\uB85C \uAC00\uC7A5 \uC62C\uBC14\uB978 \uAC83\uC740?",
-            "%s\uC5D0 \uB300\uD55C \uC124\uBA85 \uC911 \uC815\uB2F5\uC744 \uACE0\uB974\uC138\uC694.",
-            "\uC785\uBB38 \uC218\uC900\uC5D0\uC11C %s\uB97C \uC124\uBA85\uD560 \uB54C \uB9DE\uB294 \uC120\uD0DD\uC740?"
+            "%s의 기본 개념으로 가장 올바른 것은?",
+            "%s에 대한 설명 중 정답을 고르세요.",
+            "입문 수준에서 %s를 설명할 때 맞는 선택은?"
     };
 
     private static final String[] MEDIUM_PROMPTS = {
-            "\uC2E4\uBB34 \uC0C1\uD669\uC5D0\uC11C %s\uB97C \uC801\uC6A9\uD560 \uB54C \uAC00\uC7A5 \uC801\uC808\uD55C \uAC83\uC740?",
-            "%s \uAD00\uB828 \uC758\uC0AC\uACB0\uC815\uC73C\uB85C \uC62C\uBC14\uB978 \uC120\uD0DD\uC740?",
-            "%s\uB97C \uAD6C\uD604\uD558\uB294 \uACFC\uC815\uC5D0\uC11C \uCD5C\uC120\uC758 \uBC29\uBC95\uC740?"
+            "실무 상황에서 %s를 적용할 때 가장 적절한 것은?",
+            "%s 관련 의사결정으로 올바른 선택은?",
+            "%s를 구현하는 과정에서 최선의 방법은?"
     };
 
     private static final String[] HARD_PROMPTS = {
-            "\uB300\uADE8\uBAA8 \uD2B8\uB798\uD53D \uD658\uACBD\uC5D0\uC11C %s\uB97C \uCC98\uB9AC\uD558\uB294 \uCD5C\uC120\uC758 \uC120\uD0DD\uC740?",
-            "%s\uC5D0\uC11C \uD2B8\uB808\uC774\uB4DC\uC624\uD504\uB97C \uACE0\uB824\uD560 \uB54C \uAC00\uC7A5 \uD569\uB9AC\uC801\uC778 \uBC29\uD5A5\uC740?",
-            "%s \uBB38\uC81C\uB97C \uC2EC\uCE35 \uD574\uACB0\uD560 \uB54C \uAC00\uC7A5 \uC801\uC808\uD55C \uC811\uADFC\uC740?"
+            "대귨모 트래픽 환경에서 %s를 처리하는 최선의 선택은?",
+            "%s에서 트레이드오프를 고려할 때 가장 합리적인 방향은?",
+            "%s 문제를 심층 해결할 때 가장 적절한 접근은?"
     };
 
     private static final Map<String, Template> TEMPLATE_INDEX = buildTemplateIndex();
@@ -215,7 +215,7 @@ final class MockLearningTemplateCatalog {
 
     private static List<Card> frontendCards() {
         return List.of(
-                card("React state \uAD00\uB9AC", "상태는 불변 업데이트로 변경하고 렌더링 반영을 확인한다.", "React는 참조 변경 기반으로 렌더링을 판단하므로 불변 업데이트가 안전하다.",
+                card("React state 관리", "상태는 불변 업데이트로 변경하고 렌더링 반영을 확인한다.", "React는 참조 변경 기반으로 렌더링을 판단하므로 불변 업데이트가 안전하다.",
                         List.of("상태 객체를 직접 수정해도 동일하다.", "DOM을 직접 조작하면 state가 필요 없다.", "모든 상태를 localStorage에만 저장한다.", "입력마다 새로고침으로 UI를 갱신한다.")),
                 card("useEffect 의존성", "effect 내부에서 사용하는 반응형 값을 의존성 배열에 정확히 넣는다.", "의존성 누락은 stale closure를 만들고 동기화 오류를 유발한다.",
                         List.of("성능을 위해 항상 빈 배열만 사용한다.", "경고를 없애기 위해 임의 값만 넣는다.", "effect 로직을 렌더 본문에 넣는다.", "setInterval로만 대체한다.")),

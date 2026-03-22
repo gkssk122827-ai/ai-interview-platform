@@ -6,12 +6,14 @@ import com.aimentor.common.security.jwt.JwtTokenProvider;
 import com.aimentor.common.security.jwt.JwtTokenType;
 import com.aimentor.domain.user.dto.request.LoginRequest;
 import com.aimentor.domain.user.dto.request.LogoutRequest;
+import com.aimentor.domain.user.dto.request.MyInfoUpdateRequest;
 import com.aimentor.domain.user.dto.request.RefreshTokenRequest;
 import com.aimentor.domain.user.dto.request.SignupRequest;
 import com.aimentor.domain.user.dto.response.AuthTokenResponse;
 import com.aimentor.domain.user.dto.response.MyInfoResponse;
 import com.aimentor.domain.user.entity.Role;
 import com.aimentor.domain.user.entity.User;
+import com.aimentor.domain.user.entity.UserStatus;
 import com.aimentor.domain.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import org.springframework.http.HttpStatus;
@@ -62,6 +64,7 @@ public class AuthService {
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Email or password is incorrect.");
         }
+        ensureUserAccessible(user);
 
         return issueTokens(user);
     }
@@ -75,6 +78,7 @@ public class AuthService {
         }
 
         User user = getUser(claims.userId());
+        ensureUserAccessible(user);
 
         if (user.getRefreshToken() == null || !user.getRefreshToken().equals(request.refreshToken())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_MISMATCH", "Refresh token does not match the stored token.");
@@ -115,8 +119,17 @@ public class AuthService {
                 user.getEmail(),
                 user.getPhone(),
                 user.getRole(),
+                user.getStatus(),
                 user.getCreatedAt()
         );
+    }
+
+    @Transactional
+    public MyInfoResponse updateMyInfo(Long userId, MyInfoUpdateRequest request) {
+        User user = getUser(userId);
+        ensureUserAccessible(user);
+        user.updateProfile(request.name().trim(), request.phone().trim());
+        return getMyInfo(userId);
     }
 
     private AuthTokenResponse issueTokens(User user) {
@@ -136,6 +149,7 @@ public class AuthService {
                 user.getEmail(),
                 user.getPhone(),
                 user.getRole(),
+                user.getStatus(),
                 accessToken,
                 accessTokenExpiresAt,
                 refreshToken,
@@ -146,5 +160,14 @@ public class AuthService {
     private User getUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_NOT_FOUND", "User not found."));
+    }
+
+    private void ensureUserAccessible(User user) {
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "USER_SUSPENDED", "정지된 회원은 로그인할 수 없습니다.");
+        }
+        if (user.getStatus() == UserStatus.WITHDRAWN) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "USER_WITHDRAWN", "탈퇴 처리된 회원입니다.");
+        }
     }
 }

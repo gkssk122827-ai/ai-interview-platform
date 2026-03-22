@@ -1,6 +1,8 @@
 spring:
   application:
     name: backend
+  config:
+    import: optional:file:./.env[.properties],optional:file:./backend/.env[.properties],optional:file:../.env[.properties],optional:file:../backend/.env[.properties]
   profiles:
     active: local
   jpa:
@@ -50,6 +52,15 @@ integration:
     api-key: ${AI_API_KEY:}
     base-url: ${AI_BASE_URL:}
     model: ${AI_MODEL:}
+  payment:
+    kakao:
+      enabled: ${KAKAO_PAY_ENABLED:true}
+      admin-key: ${KAKAO_ADMIN_KEY:}
+      cid: ${KAKAO_PAY_CID:TC0ONETIME}
+      base-url: ${KAKAO_PAY_BASE_URL:https://kapi.kakao.com}
+      client-base-url: ${KAKAO_PAY_CLIENT_BASE_URL:http://localhost:5173}
+      connect-timeout-millis: ${KAKAO_PAY_CONNECT_TIMEOUT_MILLIS:5000}
+      read-timeout-millis: ${KAKAO_PAY_READ_TIMEOUT_MILLIS:10000}
   speech:
     provider: ${SPEECH_PROVIDER:${AI_PROVIDER:python}}
     api-key: ${SPEECH_API_KEY:}

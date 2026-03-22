@@ -1,4 +1,5 @@
 ﻿import json
+import logging
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -15,13 +16,21 @@ from schemas.learning import (
 
 
 class LearningService:
+    logger = logging.getLogger(__name__)
     SUBJECT_PROMPTS = {
-        "영어": "learning_generate_en.txt",
-        "english": "learning_generate_en.txt",
-        "en": "learning_generate_en.txt",
-        "국사": "learning_generate_history.txt",
-        "한국사": "learning_generate_history.txt",
-        "history": "learning_generate_history.txt",
+        "프론트엔드": "learning_generate_frontend.txt",
+        "frontend": "learning_generate_frontend.txt",
+        "front-end": "learning_generate_frontend.txt",
+        "front": "learning_generate_frontend.txt",
+        "백엔드": "learning_generate_backend.txt",
+        "backend": "learning_generate_backend.txt",
+        "back-end": "learning_generate_backend.txt",
+        "풀스택": "learning_generate_fullstack.txt",
+        "fullstack": "learning_generate_fullstack.txt",
+        "full-stack": "learning_generate_fullstack.txt",
+        "데이터베이스": "learning_generate_database.txt",
+        "database": "learning_generate_database.txt",
+        "db": "learning_generate_database.txt",
     }
 
     def __init__(self, api_key: str | None, model_name: str = "gpt-4o") -> None:
@@ -75,14 +84,24 @@ class LearningService:
         # returns deterministic pass/fail data plus actionable feedback text.
         prompt = PromptTemplate.from_template(template)
         chain = prompt | llm
-        response = await chain.ainvoke(
-            {
-                "question": payload.question,
-                "correct_answer": payload.correct_answer,
-                "user_answer": payload.user_answer,
-                "explanation": payload.explanation,
-            }
-        )
+        try:
+            response = await chain.ainvoke(
+                {
+                    "question": payload.question,
+                    "correct_answer": payload.correct_answer,
+                    "user_answer": payload.user_answer,
+                    "explanation": payload.explanation,
+                }
+            )
+        except Exception as exc:
+            self.logger.exception("Learning grade prompt invocation failed.")
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "LEARNING_GRADE_PROMPT_ERROR",
+                    "message": f"Failed to invoke learning grade prompt: {exc}",
+                },
+            ) from exc
 
         data = self._parse_json_response(response.content, "LEARNING_GRADE_ERROR")
         try:
@@ -104,7 +123,10 @@ class LearningService:
                 status_code=400,
                 detail={
                     "code": "UNSUPPORTED_SUBJECT",
-                    "message": f"Unsupported subject: {subject}. Supported subjects are 영어, 국사.",
+                    "message": (
+                        f"Unsupported subject: {subject}. "
+                        "Supported subjects are 프론트엔드, 백엔드, 풀스택, 데이터베이스."
+                    ),
                 },
             )
         return prompt_name

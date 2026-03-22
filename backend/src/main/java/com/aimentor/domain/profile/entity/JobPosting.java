@@ -17,9 +17,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/**
- * Stores a job posting selected by the user for interview context.
- */
 @Getter
 @Entity
 @Table(name = "job_postings")
@@ -49,6 +46,12 @@ public class JobPosting extends BaseTimeEntity {
     @Column(length = 300)
     private String jobUrl;
 
+    @Column(length = 50)
+    private String siteName;
+
+    @Column(length = 30)
+    private String sourceStatus;
+
     private LocalDate deadline;
 
     @Builder
@@ -59,7 +62,9 @@ public class JobPosting extends BaseTimeEntity {
             String description,
             String fileUrl,
             String jobUrl,
-            LocalDate deadline
+            LocalDate deadline,
+            String siteName,
+            String sourceStatus
     ) {
         this.user = user;
         this.companyName = companyName;
@@ -68,6 +73,8 @@ public class JobPosting extends BaseTimeEntity {
         this.fileUrl = fileUrl;
         this.jobUrl = jobUrl;
         this.deadline = deadline;
+        this.siteName = siteName;
+        this.sourceStatus = sourceStatus;
     }
 
     public void update(
@@ -76,7 +83,9 @@ public class JobPosting extends BaseTimeEntity {
             String description,
             String fileUrl,
             String jobUrl,
-            LocalDate deadline
+            LocalDate deadline,
+            String siteName,
+            String sourceStatus
     ) {
         this.companyName = companyName;
         this.positionTitle = positionTitle;
@@ -84,5 +93,7 @@ public class JobPosting extends BaseTimeEntity {
         this.fileUrl = fileUrl;
         this.jobUrl = jobUrl;
         this.deadline = deadline;
+        this.siteName = siteName;
+        this.sourceStatus = sourceStatus;
     }
 }

@@ -8,22 +8,28 @@ const useStubApi = import.meta.env.VITE_USE_API_STUB === 'true'
 function normalizePayload(payload) {
   return {
     ...payload,
-    jobUrl: payload.jobUrl?.trim() ? payload.jobUrl : null,
+    companyName: payload.companyName?.trim() ?? '',
+    positionTitle: payload.positionTitle?.trim() ?? '',
+    description: payload.description?.trim() ?? '',
+    siteName: payload.siteName?.trim() ? payload.siteName.trim() : null,
+    jobUrl: payload.jobUrl?.trim() ? payload.jobUrl.trim() : null,
     deadline: payload.deadline?.trim() ? payload.deadline : null,
   }
 }
 
 const jobPostingApi = {
-  async list() {
+  async list(keyword = '') {
     if (useStubApi) {
       return stubApi.list()
     }
 
     try {
-      const response = await apiClient.get('/profiles/job-postings')
+      const response = await apiClient.get('/profiles/job-postings', {
+        params: { keyword: keyword || undefined },
+      })
       return extractPayload(response)
     } catch (error) {
-      throw new Error(extractApiErrorMessage(error, '채용공고를 불러오는 중 오류가 발생했습니다.'))
+      throw new Error(extractApiErrorMessage(error, '채용공고 목록을 불러오는 중 오류가 발생했습니다.'))
     }
   },
 
@@ -40,6 +46,15 @@ const jobPostingApi = {
       return extractPayload(response)
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, '채용공고 상세를 불러오는 중 오류가 발생했습니다.'))
+    }
+  },
+
+  async previewUrl(url) {
+    try {
+      const response = await apiClient.post('/profiles/job-postings/preview', { url })
+      return extractPayload(response)
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, '채용공고 URL을 분석하는 중 오류가 발생했습니다.'))
     }
   },
 
