@@ -15,6 +15,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ApplicationDocumentService {
 
     private static final long MAX_FILE_SIZE_BYTES = 10L * 1024L * 1024L;
+    private static final int MAX_EXTRACTED_TEXT_LENGTH = 12000;
     private static final Logger log = LoggerFactory.getLogger(ApplicationDocumentService.class);
 
     private final ApplicationDocumentRepository applicationDocumentRepository;
@@ -162,6 +166,29 @@ public class ApplicationDocumentService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PROFILE_DOCUMENT_NOT_FOUND", "Profile document not found."));
     }
 
+    public String extractStoredFileText(ApplicationDocument applicationDocument) {
+        if (applicationDocument == null || !StringUtils.hasText(applicationDocument.getStoredFilePath())) {
+            return null;
+        }
+
+        Path filePath = uploadRootPath.resolve(applicationDocument.getStoredFilePath()).normalize();
+        if (!Files.exists(filePath) || !Files.isReadable(filePath)) {
+            log.warn("[ProfileDocuments] Stored file is not readable. documentId={}, path={}", applicationDocument.getId(), filePath);
+            return null;
+        }
+
+        String originalFileName = applicationDocument.getOriginalFileName();
+        if (isPdfFile(originalFileName)) {
+            return extractPdfText(filePath);
+        }
+
+        if (isPlainTextFile(originalFileName)) {
+            return extractPlainText(filePath);
+        }
+
+        return null;
+    }
+
     private void validateContent(String resumeText, String coverLetterText, MultipartFile file, boolean hasExistingFile) {
         boolean hasResumeText = StringUtils.hasText(resumeText);
         boolean hasCoverLetterText = StringUtils.hasText(coverLetterText);
@@ -217,6 +244,59 @@ public class ApplicationDocumentService {
                 storedFileMetadata.storedFilePath(),
                 storedFileMetadata.fileUrl()
         );
+    }
+
+    private boolean isPdfFile(String fileName) {
+        return StringUtils.hasText(fileName) && fileName.toLowerCase().endsWith(".pdf");
+    }
+
+    private boolean isPlainTextFile(String fileName) {
+        if (!StringUtils.hasText(fileName)) {
+            return false;
+        }
+        String normalized = fileName.toLowerCase();
+        return normalized.endsWith(".txt") || normalized.endsWith(".md");
+    }
+
+    private String extractPdfText(Path filePath) {
+        try (PDDocument document = Loader.loadPDF(Files.readAllBytes(filePath))) {
+            PDFTextStripper textStripper = new PDFTextStripper();
+            String text = textStripper.getText(document);
+            return normalizeExtractedText(text);
+        } catch (IOException exception) {
+            log.warn("[ProfileDocuments] Failed to extract PDF text. path={}", filePath, exception);
+            return null;
+        }
+    }
+
+    private String extractPlainText(Path filePath) {
+        try {
+            return normalizeExtractedText(Files.readString(filePath));
+        } catch (IOException exception) {
+            log.warn("[ProfileDocuments] Failed to read plain text document. path={}", filePath, exception);
+            return null;
+        }
+    }
+
+    private String normalizeExtractedText(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+
+        String normalized = value
+                .replace("\r\n", "\n")
+                .replaceAll("[\\t\\x0B\\f]+", " ")
+                .replaceAll("(?m)^\\s+$", "")
+                .replaceAll(" {2,}", " ")
+                .replaceAll("\\n{3,}", "\n\n")
+                .trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        if (normalized.length() > MAX_EXTRACTED_TEXT_LENGTH) {
+            return normalized.substring(0, MAX_EXTRACTED_TEXT_LENGTH).trim() + "\n[truncated]";
+        }
+        return normalized;
     }
 
     private boolean hasFile(MultipartFile file) {

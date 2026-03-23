@@ -4,6 +4,7 @@ import com.aimentor.common.api.ApiResponse;
 import com.aimentor.common.security.AuthenticatedUser;
 import com.aimentor.domain.user.dto.request.LoginRequest;
 import com.aimentor.domain.user.dto.request.LogoutRequest;
+import com.aimentor.domain.user.dto.request.MyInfoUpdateRequest;
 import com.aimentor.domain.user.dto.request.RefreshTokenRequest;
 import com.aimentor.domain.user.dto.request.SignupRequest;
 import com.aimentor.domain.user.dto.response.AuthTokenResponse;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -57,5 +59,13 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<MyInfoResponse> me(@AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         return ApiResponse.success(authService.getMyInfo(authenticatedUser.userId()));
+    }
+
+    @PutMapping("/me")
+    public ApiResponse<MyInfoResponse> updateMe(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @Valid @RequestBody MyInfoUpdateRequest request
+    ) {
+        return ApiResponse.success(authService.updateMyInfo(authenticatedUser.userId(), request));
     }
 }

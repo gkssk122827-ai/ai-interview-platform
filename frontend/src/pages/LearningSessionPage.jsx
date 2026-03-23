@@ -32,7 +32,7 @@ function saveLearningResult(totalCount, correctCount) {
 }
 
 function LearningSessionPage() {
-  usePageTitle('\uD559\uC2B5 \uC138\uC158')
+  usePageTitle('학습 세션')
   const location = useLocation()
   const navigate = useNavigate()
   const problems = location.state?.problems ?? []
@@ -59,9 +59,9 @@ function LearningSessionPage() {
     return (
       <section className="workspace-page">
         <EmptyState
-          title={'\uC0DD\uC131\uB41C \uD559\uC2B5 \uBB38\uC81C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.'}
-          description={'\uD559\uC2B5 \uC124\uC815\uC73C\uB85C \uB3CC\uC544\uAC00 \uACFC\uBAA9\uACFC \uB09C\uC774\uB3C4\uB97C \uB2E4\uC2DC \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.'}
-          action={<button className="button" type="button" onClick={() => navigate('/learning')}>{'\uC124\uC815 \uD654\uBA74\uC73C\uB85C \uC774\uB3D9'}</button>}
+          title={'생성된 학습 문제가 없습니다.'}
+          description={'학습 설정으로 돌아가 과목과 난이도를 다시 선택해 주세요.'}
+          action={<button className="button" type="button" onClick={() => navigate('/learning')}>{'설정 화면으로 이동'}</button>}
         />
       </section>
     )
@@ -73,7 +73,7 @@ function LearningSessionPage() {
     }
 
     if (!currentProblem || !answerValue.trim()) {
-      setError('\uB2F5\uC548\uC744 \uC785\uB825\uD558\uAC70\uB098 \uBCF4\uAE30\uB97C \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.')
+      setError('답안을 입력하거나 보기를 선택해 주세요.')
       return
     }
 
@@ -124,38 +124,38 @@ function LearningSessionPage() {
     return (
       <section className="workspace-page">
         <div className="workspace-page__hero">
-          <p className="page-card__eyebrow">{'\uD559\uC2B5 \uACB0\uACFC'}</p>
-          <h2 className="page-card__title">{'\uD559\uC2B5\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.'}</h2>
+          <p className="page-card__eyebrow">{'학습 결과'}</p>
+          <h2 className="page-card__title">{'학습이 완료되었습니다.'}</h2>
           <p className="page-card__description">
-            {`\uCD1D ${problems.length}\uBB38\uC81C \uC911 ${correctCount}\uBB38\uC81C\uB97C \uB9DE\uCD94\uC168\uC2B5\uB2C8\uB2E4.`}
+            {`총 ${problems.length}문제 중 ${correctCount}문제를 맞추셨습니다.`}
           </p>
         </div>
 
         <article className="panel">
           <div className="panel__header">
             <div>
-              <h3 className="panel__title">{'\uC804\uCCB4 \uBB38\uC81C \uC694\uC57D'}</h3>
+              <h3 className="panel__title">{'전체 문제 요약'}</h3>
             </div>
           </div>
-          <p className="panel__subtitle">{`\uC804\uCCB4 \uBB38\uC81C: ${problems.length}`}</p>
-          <p className="panel__subtitle">{`\uC815\uB2F5 \uBB38\uC81C: ${correctCount}`}</p>
-          <p className="panel__subtitle">{`\uC624\uB2F5 \uBB38\uC81C: ${wrongNotes.length}`}</p>
+          <p className="panel__subtitle">{`전체 문제: ${problems.length}`}</p>
+          <p className="panel__subtitle">{`정답 문제: ${correctCount}`}</p>
+          <p className="panel__subtitle">{`오답 문제: ${wrongNotes.length}`}</p>
         </article>
 
         {wrongNotes.length > 0 ? (
           <article className="panel">
             <div className="panel__header">
               <div>
-                <h3 className="panel__title">{'\uC624\uB2F5\uB178\uD2B8'}</h3>
+                <h3 className="panel__title">{'오답노트'}</h3>
               </div>
             </div>
             <div className="resource-list">
               {wrongNotes.map((note, index) => (
                 <div key={`${note.question}-${index}`} className="resource-list__item resource-list__item--static">
                   <strong>{`${index + 1}. ${note.question}`}</strong>
-                  <p className="panel__subtitle">{`\uB0B4 \uB2F5\uC548: ${note.userAnswer}`}</p>
-                  <p className="panel__subtitle">{`\uC815\uB2F5: ${note.correctAnswer}`}</p>
-                  <p className="panel__subtitle">{`\uD574\uC124: ${note.explanation}`}</p>
+                  <p className="panel__subtitle">{`내 답안: ${note.userAnswer}`}</p>
+                  <p className="panel__subtitle">{`정답: ${note.correctAnswer}`}</p>
+                  <p className="panel__subtitle">{`해설: ${note.explanation}`}</p>
                   <p className="panel__subtitle">{note.aiFeedback}</p>
                 </div>
               ))}
@@ -165,7 +165,7 @@ function LearningSessionPage() {
 
         <div className="button-row">
           <button className="button" type="button" onClick={() => navigate('/learning')}>
-            {'\uD559\uC2B5 \uB2E4\uC2DC \uC2DC\uC791'}
+            {'학습 다시 시작'}
           </button>
         </div>
       </section>
@@ -175,9 +175,9 @@ function LearningSessionPage() {
   return (
     <section className="workspace-page">
       <div className="workspace-page__hero">
-        <p className="page-card__eyebrow">{'\uD559\uC2B5 \uC138\uC158'}</p>
-        <h2 className="page-card__title">{`\uBB38\uC81C ${currentIndex + 1} / ${problems.length}`}</h2>
-        <p className="page-card__description">{'\uBB38\uC81C\uB97C \uD480\uACE0 AI \uCC44\uC810 \uACB0\uACFC\uB97C \uD655\uC778\uD574 \uBCF4\uC138\uC694.'}</p>
+        <p className="page-card__eyebrow">{'학습 세션'}</p>
+        <h2 className="page-card__title">{`문제 ${currentIndex + 1} / ${problems.length}`}</h2>
+        <p className="page-card__description">{'문제를 풀고 AI 채점 결과를 확인해 보세요.'}</p>
       </div>
 
       <StatusMessage variant="error" message={error} />
@@ -186,7 +186,7 @@ function LearningSessionPage() {
         <div className="panel__header">
           <div>
             <h3 className="panel__title">{currentProblem.question}</h3>
-            <p className="panel__subtitle">{'\uC720\uD615: \uAC1D\uAD00\uC2DD'}</p>
+            <p className="panel__subtitle">{'유형: 객관식'}</p>
           </div>
         </div>
 
@@ -205,21 +205,21 @@ function LearningSessionPage() {
           </div>
         ) : (
           <TextAreaField
-            label={'\uB2F5\uC548'}
+            label={'답안'}
             rows={6}
             value={shortAnswer}
             onChange={(event) => setShortAnswer(event.target.value)}
-            placeholder={'\uC815\uB2F5\uC744 \uC785\uB825\uD574 \uC8FC\uC138\uC694.'}
+            placeholder={'정답을 입력해 주세요.'}
           />
         )}
 
         <div className="button-row">
           <button className="button" type="button" onClick={handleSubmit} disabled={isSubmitting || Boolean(feedback)}>
-            {isSubmitting ? '\uCC44\uC810 \uACB0\uACFC\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\uC785\uB2C8\uB2E4.' : '\uC81C\uCD9C'}
+            {isSubmitting ? '채점 결과를 불러오는 중입니다.' : '제출'}
           </button>
           {feedback ? (
             <button className="button button--secondary" type="button" onClick={handleNext}>
-              {currentIndex >= problems.length - 1 ? '\uD559\uC2B5 \uACB0\uACFC \uBCF4\uAE30' : '\uB2E4\uC74C \uBB38\uC81C'}
+              {currentIndex >= problems.length - 1 ? '학습 결과 보기' : '다음 문제'}
             </button>
           ) : null}
         </div>
@@ -229,10 +229,10 @@ function LearningSessionPage() {
         <article className="panel">
           <div className="panel__header">
             <div>
-              <h3 className="panel__title">{'\uCC44\uC810 \uACB0\uACFC'}</h3>
+              <h3 className="panel__title">{'채점 결과'}</h3>
             </div>
           </div>
-          <p className="panel__subtitle">{feedback.isCorrect ? '\uC815\uB2F5\uC785\uB2C8\uB2E4.' : '\uC624\uB2F5\uC785\uB2C8\uB2E4.'}</p>
+          <p className="panel__subtitle">{feedback.isCorrect ? '정답입니다.' : '오답입니다.'}</p>
           <p className="panel__subtitle">{feedback.aiFeedback}</p>
         </article>
       ) : null}

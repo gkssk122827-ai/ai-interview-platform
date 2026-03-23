@@ -4,17 +4,14 @@ import EmptyState from '../components/common/EmptyState.jsx'
 import ErrorBlock from '../components/common/ErrorBlock.jsx'
 import LoadingBlock from '../components/common/LoadingBlock.jsx'
 import StatusMessage from '../components/common/StatusMessage.jsx'
-import TextInput from '../components/forms/TextInput.jsx'
 import cartApi from '../api/cartApi.js'
-import orderApi from '../api/orderApi.js'
-import { BUTTON_LABELS, EMPTY_MESSAGES, STATUS_MESSAGES } from '../constants/messages.js'
+import { EMPTY_MESSAGES, STATUS_MESSAGES } from '../constants/messages.js'
 import usePageTitle from '../hooks/usePageTitle.js'
 
 function CartPage() {
   usePageTitle('장바구니')
   const navigate = useNavigate()
   const [cart, setCart] = useState(null)
-  const [address, setAddress] = useState('서울시 강남구 테헤란로 123')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
@@ -54,16 +51,6 @@ function CartPage() {
     }
   }
 
-  async function handleOrder() {
-    try {
-      const order = await orderApi.create(address)
-      setSuccessMessage('주문이 완료되었습니다.')
-      navigate(`/orders?orderId=${order.id}`)
-    } catch (orderError) {
-      setError(orderError.message)
-    }
-  }
-
   if (isLoading) {
     return <section className="workspace-page"><LoadingBlock label={STATUS_MESSAGES.loadingCart} /></section>
   }
@@ -72,8 +59,8 @@ function CartPage() {
     <section className="workspace-page">
       <div className="workspace-page__hero">
         <p className="page-card__eyebrow">장바구니</p>
-        <h2 className="page-card__title">담아 둔 도서를 확인하고 주문해 보세요.</h2>
-        <p className="page-card__description">수량 변경과 삭제, 주문까지 실제 API와 연결됩니다.</p>
+        <h2 className="page-card__title">담아 둔 도서를 확인하고 결제 단계로 넘어가 보세요.</h2>
+        <p className="page-card__description">수량 변경과 삭제 후 주문서 작성, 결제 진행, 완료 화면까지 이어집니다.</p>
       </div>
 
       <StatusMessage variant="error" message={error} />
@@ -103,11 +90,15 @@ function CartPage() {
           </article>
 
           <article className="panel">
-            <div className="panel__header"><div><h3 className="panel__title">주문 정보</h3></div></div>
+            <div className="panel__header"><div><h3 className="panel__title">결제 준비</h3></div></div>
             <p className="panel__subtitle">총 수량: {cart?.totalQuantity ?? 0}</p>
             <p className="panel__subtitle">총 금액: {cart?.totalPrice ?? 0}원</p>
-            <TextInput label="배송지" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="배송지를 입력해 주세요." />
-            <div className="button-row"><button className="button" type="button" onClick={handleOrder} disabled={!cart?.items?.length}>{BUTTON_LABELS.orderNow}</button></div>
+            <p className="panel__subtitle">다음 단계에서 주문자 정보와 결제 수단을 입력합니다.</p>
+            <div className="button-row">
+              <button className="button" type="button" onClick={() => navigate('/checkout')} disabled={!cart?.items?.length}>
+                주문서 작성
+              </button>
+            </div>
           </article>
         </section>
       ) : null}

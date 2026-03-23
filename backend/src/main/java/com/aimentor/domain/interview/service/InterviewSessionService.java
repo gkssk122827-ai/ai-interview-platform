@@ -29,6 +29,7 @@ import com.aimentor.domain.profile.repository.ApplicationDocumentRepository;
 import com.aimentor.domain.profile.repository.CoverLetterRepository;
 import com.aimentor.domain.profile.repository.JobPostingRepository;
 import com.aimentor.domain.profile.repository.ResumeRepository;
+import com.aimentor.domain.profile.service.ApplicationDocumentService;
 import com.aimentor.domain.user.entity.User;
 import com.aimentor.domain.user.repository.UserRepository;
 import com.aimentor.external.ai.AiService;
@@ -39,7 +40,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +76,7 @@ public class InterviewSessionService {
     private final ResumeRepository resumeRepository;
     private final CoverLetterRepository coverLetterRepository;
     private final JobPostingRepository jobPostingRepository;
+    private final ApplicationDocumentService applicationDocumentService;
     private final AiService aiService;
 
     public InterviewSessionService(
@@ -85,6 +89,7 @@ public class InterviewSessionService {
             ResumeRepository resumeRepository,
             CoverLetterRepository coverLetterRepository,
             JobPostingRepository jobPostingRepository,
+            ApplicationDocumentService applicationDocumentService,
             AiService aiService
     ) {
         this.interviewSessionRepository = interviewSessionRepository;
@@ -96,6 +101,7 @@ public class InterviewSessionService {
         this.resumeRepository = resumeRepository;
         this.coverLetterRepository = coverLetterRepository;
         this.jobPostingRepository = jobPostingRepository;
+        this.applicationDocumentService = applicationDocumentService;
         this.aiService = aiService;
     }
 
@@ -264,9 +270,12 @@ public class InterviewSessionService {
         List<InterviewQuestion> questions = new ArrayList<>();
         List<String> generatedQuestions = new ArrayList<>();
         InterviewMode mode = resolveInterviewMode(session.getMode());
-        InterviewQuestionCategory category = InterviewQuestionCatalog.resolveCategory(
+        InterviewQuestionCategory category = InterviewQuestionCatalog.resolveCategoryFromContext(
                 session.getPositionTitle(),
-                session.getJobPostingSnapshot()
+                session.getJobPostingSnapshot(),
+                session.getApplicationDocumentSnapshot(),
+                session.getResumeSnapshot(),
+                session.getCoverLetterSnapshot()
         );
 
         for (int index = 1; index <= questionCount; index++) {
@@ -314,9 +323,12 @@ public class InterviewSessionService {
         List<InterviewQuestion> questions = new ArrayList<>();
         List<String> generatedQuestions = new ArrayList<>();
         InterviewMode mode = resolveInterviewMode(session.getMode());
-        InterviewQuestionCategory category = InterviewQuestionCatalog.resolveCategory(
+        InterviewQuestionCategory category = InterviewQuestionCatalog.resolveCategoryFromContext(
                 session.getPositionTitle(),
-                session.getJobPostingSnapshot()
+                session.getJobPostingSnapshot(),
+                session.getApplicationDocumentSnapshot(),
+                session.getResumeSnapshot(),
+                session.getCoverLetterSnapshot()
         );
         for (int index = 1; index <= questionCount; index++) {
             InterviewQuestionDifficulty difficulty = InterviewQuestionCatalog.resolveDifficulty(index, questionCount);
@@ -339,6 +351,12 @@ public class InterviewSessionService {
             InterviewQuestionCategory category,
             InterviewQuestionDifficulty difficulty
     ) {
+        List<String> materialHighlights = buildMaterialHighlights(session);
+        String contextualQuestion = buildContextualFallbackQuestion(materialHighlights, generatedQuestions, index, mode, difficulty);
+        if (StringUtils.hasText(contextualQuestion)) {
+            return contextualQuestion;
+        }
+
         List<String> questions = InterviewQuestionCatalog.findQuestions(mode, category, difficulty);
         String candidate = selectQuestionCandidate(session, questions, generatedQuestions, index, difficulty);
         if (StringUtils.hasText(session.getPositionTitle())
@@ -569,6 +587,7 @@ public class InterviewSessionService {
             return null;
         }
 
+        String extractedFileText = applicationDocumentService.extractStoredFileText(applicationDocument);
         StringBuilder builder = new StringBuilder();
         builder.append("Document title: ").append(applicationDocument.getTitle());
         if (StringUtils.hasText(applicationDocument.getResumeText())) {
@@ -583,6 +602,9 @@ public class InterviewSessionService {
         if (StringUtils.hasText(applicationDocument.getFileUrl())) {
             builder.append("\nFile URL: ").append(applicationDocument.getFileUrl());
         }
+        if (StringUtils.hasText(extractedFileText)) {
+            builder.append("\nExtracted file text: ").append(extractedFileText);
+        }
         return limitText(builder.toString(), MAX_CONTEXT_LENGTH);
     }
 
@@ -594,11 +616,18 @@ public class InterviewSessionService {
     }
 
     private String buildResumeSnapshotFromApplicationDocument(ApplicationDocument applicationDocument) {
-        if (applicationDocument == null || !StringUtils.hasText(applicationDocument.getResumeText())) {
+        if (applicationDocument == null) {
+            return null;
+        }
+
+        String resumeText = StringUtils.hasText(applicationDocument.getResumeText())
+                ? applicationDocument.getResumeText()
+                : applicationDocumentService.extractStoredFileText(applicationDocument);
+        if (!StringUtils.hasText(resumeText)) {
             return null;
         }
         return limitText(
-                "Resume title: " + applicationDocument.getTitle() + "\nResume content: " + applicationDocument.getResumeText(),
+                "Resume title: " + applicationDocument.getTitle() + "\nResume content: " + resumeText,
                 MAX_CONTEXT_LENGTH
         );
     }
@@ -616,12 +645,19 @@ public class InterviewSessionService {
     }
 
     private String buildCoverLetterSnapshotFromApplicationDocument(ApplicationDocument applicationDocument) {
-        if (applicationDocument == null || !StringUtils.hasText(applicationDocument.getCoverLetterText())) {
+        if (applicationDocument == null) {
+            return null;
+        }
+
+        String coverLetterText = StringUtils.hasText(applicationDocument.getCoverLetterText())
+                ? applicationDocument.getCoverLetterText()
+                : applicationDocumentService.extractStoredFileText(applicationDocument);
+        if (!StringUtils.hasText(coverLetterText)) {
             return null;
         }
         return limitText(
                 "Cover letter title: " + applicationDocument.getTitle()
-                        + "\nContent: " + applicationDocument.getCoverLetterText(),
+                        + "\nContent: " + coverLetterText,
                 MAX_CONTEXT_LENGTH
         );
     }
@@ -709,6 +745,7 @@ public class InterviewSessionService {
             InterviewQuestionDifficulty difficulty
     ) {
         StringBuilder builder = new StringBuilder();
+        List<String> materialHighlights = buildMaterialHighlights(session);
         appendLabeledSection(builder, "Session title", session.getTitle());
         appendLabeledSection(builder, "Target position", session.getPositionTitle());
         appendLabeledSection(builder, "Interview mode", mode.name());
@@ -716,6 +753,10 @@ public class InterviewSessionService {
         appendLabeledSection(builder, "Question category", category.name());
         appendLabeledSection(builder, "Question difficulty", difficulty.name());
         appendLabeledSection(builder, "Mode guidance", buildModeGuide(mode, category, difficulty, questionIndex, totalQuestionCount));
+        if (!materialHighlights.isEmpty()) {
+            appendLabeledSection(builder, "Candidate material highlights", String.join("\n", materialHighlights));
+            appendLabeledSection(builder, "Priority rule", "Prefer a question anchored to the candidate's submitted materials before asking a generic question.");
+        }
         appendLabeledSection(builder, "Job posting snapshot", session.getJobPostingSnapshot());
         if (!generatedQuestions.isEmpty()) {
             appendLabeledSection(builder, "Already generated questions", String.join("\n", generatedQuestions));
@@ -750,6 +791,7 @@ public class InterviewSessionService {
                         questionIndex,
                         totalQuestionCount,
                         buildModeGuide(mode, category, difficulty, questionIndex, totalQuestionCount),
+                        buildMaterialHighlights(session),
                         List.copyOf(generatedQuestions)
                 );
                 String questionText = aiService.generateInterviewQuestion(
@@ -845,6 +887,242 @@ public class InterviewSessionService {
         };
         return modeGuide + " " + jobGuide + " " + difficultyGuide
                 + " Question slot is " + questionIndex + " out of " + totalQuestionCount + ".";
+    }
+
+    private List<String> buildMaterialHighlights(InterviewSession session) {
+        LinkedHashSet<String> highlights = new LinkedHashSet<>();
+        appendMaterialHighlights(highlights, session.getResumeSnapshot());
+        appendMaterialHighlights(highlights, session.getCoverLetterSnapshot());
+        appendMaterialHighlights(highlights, session.getApplicationDocumentSnapshot());
+        appendMaterialHighlights(highlights, session.getJobPostingSnapshot());
+        return highlights.stream()
+                .limit(6)
+                .toList();
+    }
+
+    private void appendMaterialHighlights(LinkedHashSet<String> highlights, String snapshot) {
+        if (!StringUtils.hasText(snapshot)) {
+            return;
+        }
+
+        String[] lines = snapshot.split("\\n");
+        for (String rawLine : lines) {
+            if (isMetadataLine(rawLine)) {
+                continue;
+            }
+            String normalizedLine = stripSnapshotLabel(rawLine);
+            if (!StringUtils.hasText(normalizedLine)) {
+                continue;
+            }
+
+            String[] fragments = normalizedLine.split("(?<=[.!?])\\s+|,\\s+");
+            for (String fragment : fragments) {
+                String highlight = normalizeMaterialHighlight(fragment);
+                if (StringUtils.hasText(highlight)) {
+                    highlights.add(highlight);
+                }
+            }
+        }
+    }
+
+    private boolean isMetadataLine(String value) {
+        if (!StringUtils.hasText(value)) {
+            return true;
+        }
+
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return normalized.startsWith("document title:")
+                || normalized.startsWith("resume title:")
+                || normalized.startsWith("cover letter title:")
+                || normalized.startsWith("original file name:")
+                || normalized.startsWith("file url:")
+                || normalized.startsWith("company:")
+                || normalized.startsWith("position:");
+    }
+
+    private String stripSnapshotLabel(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        int delimiterIndex = trimmed.indexOf(':');
+        if (delimiterIndex >= 0 && delimiterIndex < trimmed.length() - 1) {
+            return trimmed.substring(delimiterIndex + 1).trim();
+        }
+        return trimmed;
+    }
+
+    private String normalizeMaterialHighlight(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+
+        String normalized = value.trim().replaceAll("\\s+", " ");
+        String lowercase = normalized.toLowerCase(Locale.ROOT);
+        if (normalized.length() < 12 || normalized.length() > 150) {
+            return null;
+        }
+        if (lowercase.startsWith("http") || lowercase.contains("[truncated]")) {
+            return null;
+        }
+        if (lowercase.startsWith("backend engineer") || lowercase.startsWith("frontend engineer")) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private String buildContextualFallbackQuestion(
+            List<String> materialHighlights,
+            List<String> generatedQuestions,
+            int index,
+            InterviewMode mode,
+            InterviewQuestionDifficulty difficulty
+    ) {
+        if (materialHighlights.isEmpty()) {
+            return null;
+        }
+
+        for (int offset = 0; offset < materialHighlights.size(); offset++) {
+            String highlight = materialHighlights.get(Math.floorMod(index - 1 + offset, materialHighlights.size()));
+            String candidate = buildDiversifiedMaterialQuestion(highlight, mode, difficulty, index + offset);
+            if (!containsSimilarQuestion(generatedQuestions, candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private String buildMaterialQuestion(String highlight, InterviewMode mode, InterviewQuestionDifficulty difficulty) {
+        String quotedHighlight = "'" + highlight + "'";
+        return switch (mode) {
+            case BEHAVIORAL -> switch (difficulty) {
+                case EASY -> quotedHighlight + " 경험에서 맡았던 역할과 협업 방식을 설명해 주세요.";
+                case MEDIUM -> quotedHighlight + " 경험에서 문제 상황이 생겼을 때 어떻게 조율하고 해결했는지 설명해 주세요.";
+                case HARD -> quotedHighlight + " 경험에서 본인이 주도적으로 내린 판단과 그 근거를 설명해 주세요.";
+            };
+            case TECHNICAL -> switch (difficulty) {
+                case EASY -> quotedHighlight + "와 관련해 실제로 사용한 기술과 구현 방식을 설명해 주세요.";
+                case MEDIUM -> quotedHighlight + "를 수행하면서 겪은 기술적 문제와 해결 과정을 설명해 주세요.";
+                case HARD -> quotedHighlight + "에서 기술 선택이나 아키텍처를 결정할 때 고려한 트레이드오프를 설명해 주세요.";
+            };
+            case RESUME_BASED -> switch (difficulty) {
+                case EASY -> "지원 자료에 적힌 " + quotedHighlight + " 내용에서 직접 기여한 부분을 설명해 주세요.";
+                case MEDIUM -> "지원 자료에 적힌 " + quotedHighlight + " 내용이 실제 성과로 이어진 과정을 설명해 주세요.";
+                case HARD -> "지원 자료에 적힌 " + quotedHighlight + " 성과나 주장에 대해 어떤 지표와 근거로 검증할 수 있는지 설명해 주세요.";
+            };
+            case COMPREHENSIVE -> switch (difficulty) {
+                case EASY -> "지원 자료에 적힌 " + quotedHighlight + " 경험을 소개하고, 이 경험이 지원 직무와 어떻게 연결되는지 설명해 주세요.";
+                case MEDIUM -> "지원 자료에 적힌 " + quotedHighlight + " 경험을 바탕으로 문제 해결 과정과 협업 방식을 함께 설명해 주세요.";
+                case HARD -> "지원 자료에 적힌 " + quotedHighlight + " 경험에서 기술적 판단과 비즈니스 판단을 어떻게 균형 있게 가져갔는지 설명해 주세요.";
+            };
+        };
+    }
+
+    private String buildDiversifiedMaterialQuestion(
+            String highlight,
+            InterviewMode mode,
+            InterviewQuestionDifficulty difficulty,
+            int questionSeed
+    ) {
+        String quotedHighlight = "'" + highlight + "'";
+        String focus = resolveQuestionFocus(mode, difficulty, questionSeed);
+        return switch (mode) {
+            case BEHAVIORAL -> switch (difficulty) {
+                case EASY -> switch (focus) {
+                    case "collaboration" -> quotedHighlight + " 경험에서 누구와 어떻게 협업했는지 설명해 주세요.";
+                    case "motivation" -> quotedHighlight + " 경험을 맡게 된 배경과 동기를 설명해 주세요.";
+                    default -> quotedHighlight + " 경험에서 맡았던 역할과 책임 범위를 설명해 주세요.";
+                };
+                case MEDIUM -> switch (focus) {
+                    case "communication" -> quotedHighlight + " 경험에서 이해관계자와 조율이 필요했던 상황을 어떻게 풀었는지 설명해 주세요.";
+                    case "ownership" -> quotedHighlight + " 경험에서 본인이 먼저 문제를 발견하고 주도적으로 움직인 장면을 설명해 주세요.";
+                    default -> quotedHighlight + " 경험에서 예상과 다른 문제가 생겼을 때 어떻게 해결했는지 설명해 주세요.";
+                };
+                case HARD -> switch (focus) {
+                    case "decision" -> quotedHighlight + " 경험에서 쉽지 않은 결정을 내렸던 순간과 그 근거를 설명해 주세요.";
+                    case "tradeoff" -> quotedHighlight + " 경험에서 품질, 일정, 범위 사이의 트레이드오프를 어떻게 판단했는지 설명해 주세요.";
+                    default -> quotedHighlight + " 경험에서 리스크를 감수하고 책임 있게 대응했던 사례를 설명해 주세요.";
+                };
+            };
+            case TECHNICAL -> switch (difficulty) {
+                case EASY -> switch (focus) {
+                    case "rendering" -> quotedHighlight + "와 관련한 화면 동작이나 렌더링 흐름을 어떻게 구현했는지 설명해 주세요.";
+                    case "integration" -> quotedHighlight + "를 구현할 때 API 또는 상태와 어떻게 연결했는지 설명해 주세요.";
+                    default -> quotedHighlight + "와 관련해 실제 사용한 기술 스택과 구현 방식을 설명해 주세요.";
+                };
+                case MEDIUM -> switch (focus) {
+                    case "performance" -> quotedHighlight + "를 수행하면서 성능 병목을 어떻게 찾고 개선했는지 설명해 주세요.";
+                    case "state" -> quotedHighlight + "를 구현할 때 상태 관리나 데이터 흐름을 어떻게 설계했는지 설명해 주세요.";
+                    default -> quotedHighlight + "를 진행하면서 겪은 기술적 문제와 해결 과정을 설명해 주세요.";
+                };
+                case HARD -> switch (focus) {
+                    case "tradeoff" -> quotedHighlight + "에서 기술 선택의 트레이드오프를 어떻게 판단했는지 설명해 주세요.";
+                    case "quality" -> quotedHighlight + "를 장기적으로 유지보수하기 위해 테스트나 품질 전략을 어떻게 가져갔는지 설명해 주세요.";
+                    default -> quotedHighlight + "에서 아키텍처나 구조를 결정할 때 고려한 핵심 기준을 설명해 주세요.";
+                };
+            };
+            case RESUME_BASED -> switch (difficulty) {
+                case EASY -> switch (focus) {
+                    case "contribution" -> "지원 자료에 적힌 " + quotedHighlight + " 내용에서 본인이 직접 기여한 부분을 설명해 주세요.";
+                    case "context" -> "지원 자료에 적힌 " + quotedHighlight + " 내용이 어떤 맥락에서 나온 것인지 설명해 주세요.";
+                    default -> "지원 자료에 적힌 " + quotedHighlight + " 내용을 바탕으로 핵심 경험을 소개해 주세요.";
+                };
+                case MEDIUM -> switch (focus) {
+                    case "outcome" -> "지원 자료에 적힌 " + quotedHighlight + " 내용이 실제 결과로 이어진 과정을 설명해 주세요.";
+                    case "problem" -> "지원 자료에 적힌 " + quotedHighlight + " 내용에서 어떤 문제를 정의하고 해결했는지 설명해 주세요.";
+                    default -> "지원 자료에 적힌 " + quotedHighlight + " 내용을 근거와 함께 구체적으로 설명해 주세요.";
+                };
+                case HARD -> switch (focus) {
+                    case "metrics" -> "지원 자료에 적힌 " + quotedHighlight + " 성과를 어떤 지표와 데이터로 검증할 수 있는지 설명해 주세요.";
+                    case "tradeoff" -> "지원 자료에 적힌 " + quotedHighlight + " 결정에서 아쉬웠던 점이나 대안까지 함께 설명해 주세요.";
+                    default -> "지원 자료에 적힌 " + quotedHighlight + " 주장에 대해 어떻게 검증받을 수 있는지 설명해 주세요.";
+                };
+            };
+            case COMPREHENSIVE -> switch (difficulty) {
+                case EASY -> switch (focus) {
+                    case "strength" -> "지원 자료에 적힌 " + quotedHighlight + " 경험을 소개하고, 이 경험이 본인의 강점과 어떻게 연결되는지 설명해 주세요.";
+                    case "fit" -> "지원 자료에 적힌 " + quotedHighlight + " 경험이 지원 직무와 어떻게 맞닿아 있는지 설명해 주세요.";
+                    default -> "지원 자료에 적힌 " + quotedHighlight + " 경험을 간단히 소개해 주세요.";
+                };
+                case MEDIUM -> switch (focus) {
+                    case "collaboration" -> "지원 자료에 적힌 " + quotedHighlight + " 경험을 바탕으로 문제 해결과 협업 과정을 함께 설명해 주세요.";
+                    case "decision" -> "지원 자료에 적힌 " + quotedHighlight + " 경험에서 어떤 판단을 했고 왜 그렇게 결정했는지 설명해 주세요.";
+                    default -> "지원 자료에 적힌 " + quotedHighlight + " 경험에서 핵심 문제와 해결 과정을 설명해 주세요.";
+                };
+                case HARD -> switch (focus) {
+                    case "business" -> "지원 자료에 적힌 " + quotedHighlight + " 경험에서 기술 판단과 비즈니스 판단을 어떻게 균형 있게 가져갔는지 설명해 주세요.";
+                    case "retrospective" -> "지원 자료에 적힌 " + quotedHighlight + " 경험을 다시 한다면 무엇을 다르게 할지 설명해 주세요.";
+                    default -> "지원 자료에 적힌 " + quotedHighlight + " 경험에서 가장 어려웠던 트레이드오프를 설명해 주세요.";
+                };
+            };
+        };
+    }
+
+    private String resolveQuestionFocus(InterviewMode mode, InterviewQuestionDifficulty difficulty, int questionSeed) {
+        List<String> focuses = switch (mode) {
+            case BEHAVIORAL -> switch (difficulty) {
+                case EASY -> List.of("role", "collaboration", "motivation");
+                case MEDIUM -> List.of("problem", "communication", "ownership");
+                case HARD -> List.of("decision", "tradeoff", "risk");
+            };
+            case TECHNICAL -> switch (difficulty) {
+                case EASY -> List.of("implementation", "rendering", "integration");
+                case MEDIUM -> List.of("problem", "performance", "state");
+                case HARD -> List.of("architecture", "tradeoff", "quality");
+            };
+            case RESUME_BASED -> switch (difficulty) {
+                case EASY -> List.of("contribution", "context", "summary");
+                case MEDIUM -> List.of("outcome", "problem", "evidence");
+                case HARD -> List.of("metrics", "tradeoff", "validation");
+            };
+            case COMPREHENSIVE -> switch (difficulty) {
+                case EASY -> List.of("strength", "fit", "summary");
+                case MEDIUM -> List.of("collaboration", "decision", "problem");
+                case HARD -> List.of("business", "retrospective", "tradeoff");
+            };
+        };
+        return focuses.get(Math.floorMod(questionSeed - 1, focuses.size()));
     }
 
     private boolean containsSimilarQuestion(List<String> existingQuestions, String candidate) {

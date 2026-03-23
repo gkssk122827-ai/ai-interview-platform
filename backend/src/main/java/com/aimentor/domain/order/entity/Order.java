@@ -46,11 +46,22 @@ public class Order extends BaseTimeEntity {
     @Column(nullable = false, length = 500)
     private String address;
 
+    @Column(length = 30)
+    private String paymentMethod;
+
+    @Column(length = 500)
+    private String paymentFailureReason;
+
     @Column(nullable = false)
     private LocalDateTime orderedAt;
 
+    private LocalDateTime paidAt;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<OrderItem> orderItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private final List<PaymentTransaction> paymentTransactions = new ArrayList<>();
 
     @Builder
     public Order(Long userId, BigDecimal totalPrice, OrderStatus status, String address, LocalDateTime orderedAt) {
@@ -66,7 +77,28 @@ public class Order extends BaseTimeEntity {
         this.orderItems.add(orderItem);
     }
 
-    public void markPaid() {
+    public void addPaymentTransaction(PaymentTransaction paymentTransaction) {
+        paymentTransaction.assignOrder(this);
+        this.paymentTransactions.add(paymentTransaction);
+    }
+
+    public void preparePayment(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+        this.paymentFailureReason = null;
+        this.paidAt = null;
+    }
+
+    public void markPaid(String paymentMethod, LocalDateTime paidAt) {
         this.status = OrderStatus.PAID;
+        this.paymentMethod = paymentMethod;
+        this.paymentFailureReason = null;
+        this.paidAt = paidAt;
+    }
+
+    public void markPaymentFailed(String paymentMethod, String paymentFailureReason) {
+        this.status = OrderStatus.PAYMENT_FAILED;
+        this.paymentMethod = paymentMethod;
+        this.paymentFailureReason = paymentFailureReason;
+        this.paidAt = null;
     }
 }

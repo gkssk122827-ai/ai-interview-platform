@@ -11,7 +11,11 @@ public record OrderResponse(
         BigDecimal totalPrice,
         OrderStatus status,
         String address,
+        String paymentMethod,
+        String paymentFailureReason,
         LocalDateTime orderedAt,
-        List<OrderItemResponse> items
+        LocalDateTime paidAt,
+        List<OrderItemResponse> items,
+        List<PaymentTransactionResponse> payments
 ) {
 }

@@ -3,6 +3,10 @@ package com.aimentor.domain.order.controller;
 import com.aimentor.common.api.ApiResponse;
 import com.aimentor.common.security.AuthenticatedUser;
 import com.aimentor.domain.order.dto.request.OrderCreateRequest;
+import com.aimentor.domain.order.dto.request.OrderPayRequest;
+import com.aimentor.domain.order.dto.request.OrderPaymentApproveRequest;
+import com.aimentor.domain.order.dto.request.OrderPaymentReadyRequest;
+import com.aimentor.domain.order.dto.response.OrderPaymentReadyResponse;
 import com.aimentor.domain.order.dto.response.OrderResponse;
 import com.aimentor.domain.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -39,9 +43,44 @@ public class OrderController {
     @PostMapping("/{orderId}/pay")
     public ApiResponse<OrderResponse> payOrder(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long orderId,
+            @Valid @RequestBody(required = false) OrderPayRequest request
+    ) {
+        return ApiResponse.success(orderService.payOrder(authenticatedUser.userId(), orderId, request));
+    }
+
+    @PostMapping("/{orderId}/payments/kakao/ready")
+    public ApiResponse<OrderPaymentReadyResponse> readyKakaoPayment(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long orderId,
+            @Valid @RequestBody(required = false) OrderPaymentReadyRequest request
+    ) {
+        return ApiResponse.success(orderService.readyKakaoPayment(authenticatedUser.userId(), orderId, request));
+    }
+
+    @PostMapping("/{orderId}/payments/kakao/approve")
+    public ApiResponse<OrderResponse> approveKakaoPayment(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long orderId,
+            @Valid @RequestBody OrderPaymentApproveRequest request
+    ) {
+        return ApiResponse.success(orderService.approveKakaoPayment(authenticatedUser.userId(), orderId, request));
+    }
+
+    @PostMapping("/{orderId}/payments/kakao/cancel")
+    public ApiResponse<OrderResponse> cancelKakaoPayment(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long orderId
     ) {
-        return ApiResponse.success(orderService.payOrder(authenticatedUser.userId(), orderId));
+        return ApiResponse.success(orderService.cancelKakaoPayment(authenticatedUser.userId(), orderId));
+    }
+
+    @PostMapping("/{orderId}/payments/kakao/fail")
+    public ApiResponse<OrderResponse> failKakaoPayment(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long orderId
+    ) {
+        return ApiResponse.success(orderService.failKakaoPayment(authenticatedUser.userId(), orderId));
     }
 
     @GetMapping

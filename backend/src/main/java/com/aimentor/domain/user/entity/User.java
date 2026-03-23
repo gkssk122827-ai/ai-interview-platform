@@ -44,6 +44,10 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private Role role;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserStatus status;
+
     @Column(length = 1000)
     private String refreshToken;
 
@@ -56,6 +60,7 @@ public class User extends BaseTimeEntity {
         this.phone = phone;
         this.password = password;
         this.role = role;
+        this.status = UserStatus.ACTIVE;
     }
 
     public void updateRefreshToken(String refreshToken, LocalDateTime refreshTokenExpiresAt) {
@@ -66,5 +71,17 @@ public class User extends BaseTimeEntity {
     public void clearRefreshToken() {
         this.refreshToken = null;
         this.refreshTokenExpiresAt = null;
+    }
+
+    public void updateProfile(String name, String phone) {
+        this.name = name;
+        this.phone = phone;
+    }
+
+    public void updateStatus(UserStatus status) {
+        this.status = status;
+        if (status == UserStatus.SUSPENDED || status == UserStatus.WITHDRAWN) {
+            clearRefreshToken();
+        }
     }
 }
