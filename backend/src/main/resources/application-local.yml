@@ -2,7 +2,7 @@ spring:
   config:
     import: optional:file:./.env[.properties],optional:file:./backend/.env[.properties],optional:file:../.env[.properties],optional:file:../backend/.env[.properties]
   datasource:
-    url: jdbc:mariadb://${DB_HOST:localhost}:${DB_PORT:3308}/${DB_NAME:ai_interview}?useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    url: jdbc:mariadb://${DB_HOST:localhost}:${DB_PORT:3308}/${DB_NAME:ai_interview_hn}?useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:1234}
     driver-class-name: org.mariadb.jdbc.Driver

@@ -9,7 +9,7 @@ function formatUpdatedAt(value) {
 
 function DocumentList({ items, selectedId, onSelect }) {
   return (
-    <div className="resource-list">
+    <div className="resource-list document-list">
       {items.map((item) => (
         <button key={item.id} type="button" className={item.id === selectedId ? 'resource-list__item resource-list__item--active' : 'resource-list__item'} onClick={() => onSelect(item.id)}>
           <strong>{item.title}</strong>

@@ -17,6 +17,11 @@ const emptyJobPosting = {
   deadline: '',
 }
 
+const REGISTER_MODE = {
+  MANUAL: 'manual',
+  URL: 'url',
+}
+
 function normalizeForm(item) {
   return {
     companyName: item?.companyName ?? '',
@@ -41,6 +46,7 @@ function AdminJobPostingEditorPage() {
   usePageTitle(isCreateMode ? '채용공고 등록' : '채용공고 수정')
 
   const [form, setForm] = useState(emptyJobPosting)
+  const [registerMode, setRegisterMode] = useState(REGISTER_MODE.MANUAL)
   const [isLoading, setIsLoading] = useState(!isCreateMode)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -53,6 +59,7 @@ function AdminJobPostingEditorPage() {
     async function loadJobPosting() {
       if (isCreateMode) {
         setForm(emptyJobPosting)
+        setRegisterMode(REGISTER_MODE.MANUAL)
         setIsLoading(false)
         return
       }
@@ -63,6 +70,7 @@ function AdminJobPostingEditorPage() {
       try {
         const item = await jobPostingApi.get(jobPostingId)
         setForm(normalizeForm(item))
+        setRegisterMode(item?.jobUrl ? REGISTER_MODE.URL : REGISTER_MODE.MANUAL)
       } catch (loadError) {
         setError(loadError.message)
       } finally {
@@ -93,10 +101,14 @@ function AdminJobPostingEditorPage() {
     setNotice('')
 
     try {
+      const payload = registerMode === REGISTER_MODE.URL
+        ? { jobUrl: form.jobUrl, deadline: null }
+        : form
+
       if (isCreateMode) {
-        await jobPostingApi.create(form)
+        await jobPostingApi.create(payload)
       } else {
-        await jobPostingApi.update(jobPostingId, form)
+        await jobPostingApi.update(jobPostingId, payload)
       }
 
       notifyOpener('jobPosting:saved')
@@ -157,7 +169,7 @@ function AdminJobPostingEditorPage() {
         <p className="page-card__eyebrow">관리자</p>
         <h2 className="page-card__title">{pageTitle}</h2>
         <p className="page-card__description">
-          채용공고를 저장하면 관리자 페이지 목록이 자동으로 갱신됩니다.
+          채용공고를 등록하면 관리자 페이지 목록이 자동으로 갱신됩니다.
         </p>
       </div>
 
@@ -165,48 +177,89 @@ function AdminJobPostingEditorPage() {
         <div className="panel__header">
           <div>
             <h3 className="panel__title">{pageTitle}</h3>
-            <p className="panel__subtitle">채용공고 정보와 상세 설명을 입력해 주세요.</p>
+            <p className="panel__subtitle">직접 입력 또는 URL 등록 중 하나를 선택해 저장하세요.</p>
           </div>
         </div>
 
+        <div className="button-row admin-tab-row" role="tablist" aria-label="채용공고 등록 방식">
+          <button
+            className={registerMode === REGISTER_MODE.MANUAL ? 'button' : 'button button--secondary'}
+            type="button"
+            role="tab"
+            aria-selected={registerMode === REGISTER_MODE.MANUAL}
+            onClick={() => setRegisterMode(REGISTER_MODE.MANUAL)}
+            disabled={isSaving || isDeleting}
+          >
+            직접 입력
+          </button>
+          <button
+            className={registerMode === REGISTER_MODE.URL ? 'button' : 'button button--secondary'}
+            type="button"
+            role="tab"
+            aria-selected={registerMode === REGISTER_MODE.URL}
+            onClick={() => setRegisterMode(REGISTER_MODE.URL)}
+            disabled={isSaving || isDeleting}
+          >
+            URL 등록
+          </button>
+        </div>
+
         <StatusMessage variant="success" message={notice} />
-        <StatusMessage variant="error" message={form.positionTitle ? error : ''} />
+        <StatusMessage variant="error" message={error} />
 
         <form className="editor-form" onSubmit={handleSubmit}>
-          <TextInput
-            label="회사명"
-            value={form.companyName}
-            onChange={(event) => updateField('companyName', event.target.value)}
-            placeholder="예: AIMentor"
-            required
-          />
-          <TextInput
-            label="채용공고 제목"
-            value={form.positionTitle}
-            onChange={(event) => updateField('positionTitle', event.target.value)}
-            placeholder="예: 백엔드 개발자"
-            required
-          />
-          <TextAreaField
-            label="채용공고 설명"
-            value={form.description}
-            onChange={(event) => updateField('description', event.target.value)}
-            placeholder="주요 업무, 자격 요건, 우대 사항을 입력해 주세요."
-            rows={10}
-            required
-          />
-          <TextInput
-            label="채용공고 URL"
-            value={form.jobUrl}
-            onChange={(event) => updateField('jobUrl', event.target.value)}
-            placeholder="https://example.com/jobs/backend"
-          />
-          <TextInput
-            label="마감일"
-            type="date"
-            value={form.deadline}
-            onChange={(event) => updateField('deadline', event.target.value)}
-          />
+          {registerMode === REGISTER_MODE.MANUAL ? (
+            <>
+              <TextInput
+                label="회사명"
+                value={form.companyName}
+                onChange={(event) => updateField('companyName', event.target.value)}
+                placeholder="예: AIMentor"
+                required
+              />
+              <TextInput
+                label="채용공고 제목"
+                value={form.positionTitle}
+                onChange={(event) => updateField('positionTitle', event.target.value)}
+                placeholder="예: 백엔드 개발자"
+                required
+              />
+              <TextAreaField
+                label="채용공고 설명"
+                value={form.description}
+                onChange={(event) => updateField('description', event.target.value)}
+                placeholder="주요 업무, 자격 요건, 우대 사항을 입력해 주세요."
+                rows={10}
+                required
+              />
+              <TextInput
+                label="채용공고 URL(선택)"
+                value={form.jobUrl}
+                onChange={(event) => updateField('jobUrl', event.target.value)}
+                placeholder="https://example.com/jobs/backend"
+              />
+            </>
+          ) : (
+            <>
+              <TextInput
+                label="채용공고 URL"
+                value={form.jobUrl}
+                onChange={(event) => updateField('jobUrl', event.target.value)}
+                placeholder="https://example.com/jobs/backend"
+                required
+              />
+              <p className="panel__subtitle">URL만 입력하면 크롤링한 정보를 기반으로 저장됩니다.</p>
+            </>
+          )}
+
+          {registerMode === REGISTER_MODE.MANUAL ? (
+            <TextInput
+              label="마감일"
+              type="date"
+              value={form.deadline}
+              onChange={(event) => updateField('deadline', event.target.value)}
+            />
+          ) : null}
 
           <div className="button-row">
             <button className="button" type="submit" disabled={isSaving || isDeleting}>

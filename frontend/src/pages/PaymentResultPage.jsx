@@ -6,6 +6,7 @@ import StatusMessage from '../components/common/StatusMessage.jsx'
 import orderApi from '../api/orderApi.js'
 import usePageTitle from '../hooks/usePageTitle.js'
 import usePaymentStore from '../store/paymentStore.js'
+import { toKoreanOrderStatus, toKoreanPaymentStatus } from '../utils/paymentStatus.js'
 
 function PaymentResultPage() {
   usePageTitle('결제 결과')
@@ -126,8 +127,8 @@ function PaymentResultPage() {
         <h2 className="page-card__title">{isSuccess ? '결제가 완료되었습니다.' : '결제가 완료되지 않았습니다.'}</h2>
         <p className="page-card__description">
           {isSuccess
-            ? '카카오페이 승인 또는 모의 결제 성공이 기존 주문 완료 흐름에 반영되었습니다.'
-            : (order?.paymentFailureReason ?? '결제 결과를 확인한 뒤 다시 시도할 수 있습니다.')}
+            ? '카카오페이 승인 또는 모의 결제 성공 결과가 주문 상태에 반영되었습니다.'
+            : (order?.paymentFailureReason ?? '결제 결과를 확인한 뒤 다시 시도해 주세요.')}
         </p>
       </div>
 
@@ -137,11 +138,11 @@ function PaymentResultPage() {
         <article className="panel panel--wide">
           <div className="panel__header"><div><h3 className="panel__title">주문 요약</h3></div></div>
           <p className="panel__subtitle">주문 번호: #{order?.id}</p>
-          <p className="panel__subtitle">주문 상태: {order?.status}</p>
+          <p className="panel__subtitle">주문 상태: {toKoreanOrderStatus(order?.status)}</p>
           <p className="panel__subtitle">결제 수단: {order?.paymentMethod ?? '미선택'}</p>
           <p className="panel__subtitle">총 결제 금액: {order?.totalPrice}원</p>
           {latestOrderId && String(latestOrderId) === String(order?.id) && latestPaymentStatus ? (
-            <p className="panel__subtitle">최근 결제 상태: {latestPaymentStatus} ({paymentPhase})</p>
+            <p className="panel__subtitle">최근 결제 상태: {toKoreanOrderStatus(latestPaymentStatus)} ({paymentPhase})</p>
           ) : null}
           <div className="resource-list">
             {(order?.items ?? []).map((item) => (
@@ -157,19 +158,19 @@ function PaymentResultPage() {
           <div className="panel__header"><div><h3 className="panel__title">최신 결제 시도</h3></div></div>
           {latestPayment ? (
             <>
-              <p className="panel__subtitle">결제 제공자: {latestPayment.provider}</p>
+              <p className="panel__subtitle">결제 제공사: {latestPayment.provider}</p>
               <p className="panel__subtitle">거래 키: {latestPayment.transactionKey}</p>
               {latestPayment.providerTransactionId ? <p className="panel__subtitle">PG 거래 ID: {latestPayment.providerTransactionId}</p> : null}
-              <p className="panel__subtitle">상태: {latestPayment.status}</p>
+              <p className="panel__subtitle">상태: {toKoreanPaymentStatus(latestPayment.status)}</p>
               <p className="panel__subtitle">요청 시각: {latestPayment.requestedAt}</p>
               {latestPayment.failureReason ? <p className="panel__subtitle">실패 사유: {latestPayment.failureReason}</p> : null}
             </>
           ) : (
-            <p className="panel__subtitle">결제 시도 내역이 없습니다.</p>
+            <p className="panel__subtitle">결제 시도 이력이 없습니다.</p>
           )}
           <div className="button-row">
             {!isSuccess ? <Link className="button button--secondary" to={`/payment?orderId=${order?.id}`}>다시 결제하기</Link> : null}
-            <Link className="button" to={`/orders?orderId=${order?.id}`}>주문 내역 보기</Link>
+            <Link className="button" to={`/orders?orderId=${order?.id}`}>주문 이력 보기</Link>
           </div>
         </article>
       </div>

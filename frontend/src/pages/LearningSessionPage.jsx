@@ -1,16 +1,17 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import EmptyState from '../components/common/EmptyState.jsx'
 import StatusMessage from '../components/common/StatusMessage.jsx'
 import TextAreaField from '../components/forms/TextAreaField.jsx'
 import learningApi from '../api/learningApi.js'
+import { appendWrongNotes } from '../api/learningWrongNoteStorage.js'
 import usePageTitle from '../hooks/usePageTitle.js'
 
 const LEARNING_RESULT_STORAGE_KEY = 'aimentor.learning.results'
 
 function saveLearningResult(totalCount, correctCount) {
   if (typeof window === 'undefined') {
-    return
+    return null
   }
 
   const nextRecord = {
@@ -26,8 +27,9 @@ function saveLearningResult(totalCount, correctCount) {
     const records = storedValue ? JSON.parse(storedValue) : []
     const nextRecords = [nextRecord, ...(Array.isArray(records) ? records : [])].slice(0, 200)
     window.localStorage.setItem(LEARNING_RESULT_STORAGE_KEY, JSON.stringify(nextRecords))
+    return nextRecord
   } catch {
-    // Ignore local storage write errors and continue.
+    return null
   }
 }
 
@@ -36,6 +38,8 @@ function LearningSessionPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const problems = location.state?.problems ?? []
+  const config = location.state?.config ?? {}
+
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedChoice, setSelectedChoice] = useState('')
   const [shortAnswer, setShortAnswer] = useState('')
@@ -45,6 +49,7 @@ function LearningSessionPage() {
   const [gradeResults, setGradeResults] = useState([])
   const [showResult, setShowResult] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [resultId, setResultId] = useState(null)
 
   const currentProblem = problems[currentIndex]
   const isFinished = showResult && submittedCount >= problems.length && problems.length > 0
@@ -59,8 +64,8 @@ function LearningSessionPage() {
     return (
       <section className="workspace-page">
         <EmptyState
-          title={'생성된 학습 문제가 없습니다.'}
-          description={'학습 설정으로 돌아가 과목과 난이도를 다시 선택해 주세요.'}
+          title="생성된 학습 문제가 없습니다."
+          description="학습 설정으로 돌아가 과목과 난이도를 다시 선택해 주세요."
           action={<button className="button" type="button" onClick={() => navigate('/learning')}>{'설정 화면으로 이동'}</button>}
         />
       </section>
@@ -79,6 +84,7 @@ function LearningSessionPage() {
 
     setError('')
     setIsSubmitting(true)
+
     try {
       const result = await learningApi.grade({
         question: currentProblem.question,
@@ -86,6 +92,7 @@ function LearningSessionPage() {
         userAnswer: answerValue,
         explanation: currentProblem.explanation,
       })
+
       setFeedback(result)
       setGradeResults((resultList) => [
         ...resultList,
@@ -101,6 +108,7 @@ function LearningSessionPage() {
       setSubmittedCount((countValue) => countValue + 1)
     } catch (gradeError) {
       setError(gradeError.message)
+      console.error('학습 채점 실패', gradeError)
     } finally {
       setIsSubmitting(false)
     }
@@ -112,7 +120,23 @@ function LearningSessionPage() {
     setShortAnswer('')
 
     if (currentIndex >= problems.length - 1) {
-      saveLearningResult(problems.length, correctCount)
+      const savedResult = saveLearningResult(problems.length, correctCount)
+      const nextResultId = savedResult?.id ?? null
+      setResultId(nextResultId)
+
+      const wrongNoteSaved = appendWrongNotes(wrongNotes, {
+        resultId: nextResultId,
+        subject: config.subject ?? 'unknown',
+        difficulty: config.difficulty ?? 'UNKNOWN',
+        learningType: config.type ?? 'MULTIPLE',
+      })
+
+      if (!wrongNoteSaved) {
+        const storageErrorMessage = '오답노트 저장에 실패했습니다. 브라우저 저장소 설정을 확인해 주세요.'
+        setError(storageErrorMessage)
+        console.error(storageErrorMessage)
+      }
+
       setShowResult(true)
       return
     }
@@ -124,17 +148,19 @@ function LearningSessionPage() {
     return (
       <section className="workspace-page">
         <div className="workspace-page__hero">
-          <p className="page-card__eyebrow">{'학습 결과'}</p>
-          <h2 className="page-card__title">{'학습이 완료되었습니다.'}</h2>
+          <p className="page-card__eyebrow">학습 결과</p>
+          <h2 className="page-card__title">학습을 완료했습니다.</h2>
           <p className="page-card__description">
-            {`총 ${problems.length}문제 중 ${correctCount}문제를 맞추셨습니다.`}
+            {`총 ${problems.length}문제 중 ${correctCount}문제를 맞혔습니다.`}
           </p>
         </div>
+
+        <StatusMessage variant="error" message={error} />
 
         <article className="panel">
           <div className="panel__header">
             <div>
-              <h3 className="panel__title">{'전체 문제 요약'}</h3>
+              <h3 className="panel__title">전체 문제 요약</h3>
             </div>
           </div>
           <p className="panel__subtitle">{`전체 문제: ${problems.length}`}</p>
@@ -146,7 +172,7 @@ function LearningSessionPage() {
           <article className="panel">
             <div className="panel__header">
               <div>
-                <h3 className="panel__title">{'오답노트'}</h3>
+                <h3 className="panel__title">오답노트</h3>
               </div>
             </div>
             <div className="resource-list">
@@ -164,8 +190,17 @@ function LearningSessionPage() {
         ) : null}
 
         <div className="button-row">
+          {wrongNotes.length > 0 ? (
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => navigate(resultId ? `/learning/wrong-notes?resultId=${resultId}` : '/learning/wrong-notes')}
+            >
+              오답노트 보기
+            </button>
+          ) : null}
           <button className="button" type="button" onClick={() => navigate('/learning')}>
-            {'학습 다시 시작'}
+            학습 다시 시작
           </button>
         </div>
       </section>
@@ -175,9 +210,9 @@ function LearningSessionPage() {
   return (
     <section className="workspace-page">
       <div className="workspace-page__hero">
-        <p className="page-card__eyebrow">{'학습 세션'}</p>
+        <p className="page-card__eyebrow">학습 세션</p>
         <h2 className="page-card__title">{`문제 ${currentIndex + 1} / ${problems.length}`}</h2>
-        <p className="page-card__description">{'문제를 풀고 AI 채점 결과를 확인해 보세요.'}</p>
+        <p className="page-card__description">문제를 풀고 AI 채점 결과를 확인해 보세요.</p>
       </div>
 
       <StatusMessage variant="error" message={error} />
@@ -186,7 +221,7 @@ function LearningSessionPage() {
         <div className="panel__header">
           <div>
             <h3 className="panel__title">{currentProblem.question}</h3>
-            <p className="panel__subtitle">{'유형: 객관식'}</p>
+            <p className="panel__subtitle">유형: 객관식</p>
           </div>
         </div>
 
@@ -205,11 +240,11 @@ function LearningSessionPage() {
           </div>
         ) : (
           <TextAreaField
-            label={'답안'}
+            label="답안"
             rows={6}
             value={shortAnswer}
             onChange={(event) => setShortAnswer(event.target.value)}
-            placeholder={'정답을 입력해 주세요.'}
+            placeholder="정답을 입력해 주세요."
           />
         )}
 
@@ -229,7 +264,7 @@ function LearningSessionPage() {
         <article className="panel">
           <div className="panel__header">
             <div>
-              <h3 className="panel__title">{'채점 결과'}</h3>
+              <h3 className="panel__title">채점 결과</h3>
             </div>
           </div>
           <p className="panel__subtitle">{feedback.isCorrect ? '정답입니다.' : '오답입니다.'}</p>

@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from routers.crawl import router as crawl_router
 from routers.interview import router as interview_router
 from routers.learning import router as learning_router
 from routers.stt import router as stt_router
@@ -44,6 +45,7 @@ app.include_router(stt_router)
 app.include_router(tts_router)
 app.include_router(interview_router)
 app.include_router(learning_router)
+app.include_router(crawl_router)
 
 
 @app.get("/health")

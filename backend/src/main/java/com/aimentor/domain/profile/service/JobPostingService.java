@@ -37,16 +37,17 @@ public class JobPostingService {
     @Transactional
     public JobPostingResponse create(Role role, Long userId, JobPostingUpsertRequest request) {
         User user = getUser(userId);
+        JobPostingUpsertRequest resolvedRequest = resolveRequestForSave(request);
         JobPosting jobPosting = JobPosting.builder()
                 .user(user)
-                .companyName(request.companyName())
-                .positionTitle(request.positionTitle())
-                .description(request.description())
-                .fileUrl(request.fileUrl())
-                .jobUrl(request.jobUrl())
-                .deadline(request.deadline())
-                .siteName(resolveSiteName(request))
-                .sourceStatus(resolveSourceStatus(request))
+                .companyName(resolvedRequest.companyName())
+                .positionTitle(resolvedRequest.positionTitle())
+                .description(resolvedRequest.description())
+                .fileUrl(resolvedRequest.fileUrl())
+                .jobUrl(resolvedRequest.jobUrl())
+                .deadline(resolvedRequest.deadline())
+                .siteName(resolveSiteName(resolvedRequest))
+                .sourceStatus(resolveSourceStatus(resolvedRequest))
                 .build();
         return toResponse(jobPostingRepository.save(jobPosting));
     }
@@ -72,15 +73,16 @@ public class JobPostingService {
     @Transactional
     public JobPostingResponse update(Role role, Long userId, Long jobPostingId, JobPostingUpsertRequest request) {
         JobPosting jobPosting = getJobPosting(role, userId, jobPostingId);
+        JobPostingUpsertRequest resolvedRequest = resolveRequestForSave(request);
         jobPosting.update(
-                request.companyName(),
-                request.positionTitle(),
-                request.description(),
-                request.fileUrl(),
-                request.jobUrl(),
-                request.deadline(),
-                resolveSiteName(request),
-                resolveSourceStatus(request)
+                resolvedRequest.companyName(),
+                resolvedRequest.positionTitle(),
+                resolvedRequest.description(),
+                resolvedRequest.fileUrl(),
+                resolvedRequest.jobUrl(),
+                resolvedRequest.deadline(),
+                resolveSiteName(resolvedRequest),
+                resolveSourceStatus(resolvedRequest)
         );
         return toResponse(jobPosting);
     }
@@ -140,6 +142,54 @@ public class JobPostingService {
 
     private String resolveSourceStatus(JobPostingUpsertRequest request) {
         return StringUtils.hasText(request.jobUrl()) ? "URL_REGISTERED" : "MANUAL";
+    }
+
+    private JobPostingUpsertRequest resolveRequestForSave(JobPostingUpsertRequest request) {
+        String jobUrl = trimToNull(request.jobUrl());
+        if (!StringUtils.hasText(jobUrl)) {
+            return new JobPostingUpsertRequest(
+                    trimToNull(request.companyName()),
+                    trimToNull(request.positionTitle()),
+                    trimToNull(request.description()),
+                    trimToNull(request.fileUrl()),
+                    null,
+                    request.deadline(),
+                    trimToNull(request.siteName())
+            );
+        }
+
+        validateUrl(jobUrl);
+        JobPostingUrlPreviewResponse preview = jobPostingUrlMetadataService.preview(jobUrl);
+
+        String companyName = firstNonBlank(trimToNull(request.companyName()), trimToNull(preview.companyName()), trimToNull(preview.siteName()), "Unknown");
+        String positionTitle = firstNonBlank(trimToNull(request.positionTitle()), trimToNull(preview.positionTitle()), "Untitled position");
+        String description = firstNonBlank(trimToNull(request.description()), trimToNull(preview.description()), "Description not available.");
+
+        return new JobPostingUpsertRequest(
+                companyName,
+                positionTitle,
+                description,
+                trimToNull(request.fileUrl()),
+                jobUrl,
+                request.deadline(),
+                trimToNull(request.siteName())
+        );
+    }
+
+    private String trimToNull(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private String firstNonBlank(String... candidates) {
+        for (String candidate : candidates) {
+            if (StringUtils.hasText(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private JobPostingResponse toResponse(JobPosting jobPosting) {

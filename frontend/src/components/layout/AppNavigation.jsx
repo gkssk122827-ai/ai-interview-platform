@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+﻿import { useEffect, useRef, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import authApi from '../../api/authApi.js'
 import useAuthStore from '../../store/authStore.js'
 
@@ -10,17 +10,14 @@ const publicItems = [
 
 const privateItems = [
   { to: '/dashboard', label: '대시보드' },
-  { to: '/profile-documents', label: '지원자료' },
-  { to: '/job-posting', label: '채용공고' },
   { to: '/interview/setup', label: '모의면접' },
   { to: '/learning', label: '학습' },
   { to: '/books', label: '도서' },
   { to: '/cart', label: '장바구니' },
-  { to: '/orders', label: '구매관리' },
 ]
 
 const dropdownItems = [
-  { to: '/my-page', label: '회원수정' },
+  { to: '/my-page', label: '마이페이지' },
   { to: '/profile-documents', label: '이력서 관리' },
   { to: '/orders', label: '구매관리' },
   { to: '/subscriptions', label: '구독관리' },
@@ -28,7 +25,13 @@ const dropdownItems = [
   { to: '/job-posting', label: '채용공고' },
 ]
 
+const userSectionItems = [
+  { to: '/dashboard', label: '대시보드로 돌아가기' },
+  ...dropdownItems,
+]
+
 function AppNavigation() {
+  const location = useLocation()
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const clearUser = useAuthStore((state) => state.clearUser)
@@ -64,7 +67,9 @@ function AppNavigation() {
     navigate('/auth/login', { replace: true })
   }
 
-  const visibleItems = isAuthenticated ? privateItems : publicItems
+  const dropdownRoutePrefixes = ['/my-page', '/profile-documents', '/orders', '/subscriptions', '/favorites', '/job-posting']
+  const isDropdownSection = dropdownRoutePrefixes.some((prefix) => location.pathname.startsWith(prefix))
+  const visibleItems = isAuthenticated ? (isDropdownSection ? userSectionItems : privateItems) : publicItems
 
   return (
     <nav className="app-nav" aria-label="주요 메뉴">

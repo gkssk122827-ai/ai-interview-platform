@@ -6,6 +6,7 @@ import LoadingBlock from '../components/common/LoadingBlock.jsx'
 import { EMPTY_MESSAGES, STATUS_MESSAGES } from '../constants/messages.js'
 import orderApi from '../api/orderApi.js'
 import usePageTitle from '../hooks/usePageTitle.js'
+import { toKoreanOrderStatus, toKoreanPaymentStatus } from '../utils/paymentStatus.js'
 
 function OrderPage() {
   usePageTitle('주문')
@@ -81,7 +82,7 @@ function OrderPage() {
     <section className="workspace-page">
       <div className="workspace-page__hero">
         <p className="page-card__eyebrow">주문</p>
-        <h2 className="page-card__title">주문과 결제 내역을 한 번에 확인해 보세요.</h2>
+        <h2 className="page-card__title">주문과 결제 이력을 한 번에 확인해 보세요.</h2>
         <p className="page-card__description">카카오페이와 모의 결제 이력이 모두 같은 주문 상세 화면에 반영됩니다.</p>
       </div>
 
@@ -100,7 +101,7 @@ function OrderPage() {
                   onClick={() => handleSelectOrder(order.id)}
                 >
                   <strong>주문 #{order.id}</strong>
-                  <span>{order.status} · {order.totalPrice}원</span>
+                  <span>{toKoreanOrderStatus(order.status)} · {order.totalPrice}원</span>
                   <span>{order.orderedAt}</span>
                 </button>
               ))}
@@ -113,7 +114,7 @@ function OrderPage() {
             {!isDetailLoading && detailError ? <ErrorBlock message={detailError} /> : null}
             {!isDetailLoading && !detailError && selectedOrder ? (
               <>
-                <p className="panel__subtitle">상태: {selectedOrder.status}</p>
+                <p className="panel__subtitle">상태: {toKoreanOrderStatus(selectedOrder.status)}</p>
                 <p className="panel__subtitle">배송지: {selectedOrder.address}</p>
                 <p className="panel__subtitle">총 금액: {selectedOrder.totalPrice}원</p>
                 <p className="panel__subtitle">결제 수단: {selectedOrder.paymentMethod ?? '미선택'}</p>
@@ -132,14 +133,14 @@ function OrderPage() {
                 <div className="resource-list">
                   {(selectedOrder.payments ?? []).length ? selectedOrder.payments.map((payment) => (
                     <div key={payment.id} className="resource-list__item resource-list__item--static">
-                      <strong>{payment.provider} · {payment.status}</strong>
+                      <strong>{payment.provider} · {toKoreanPaymentStatus(payment.status)}</strong>
                       <span>결제 수단: {payment.paymentMethod}</span>
                       <span>거래 키: {payment.transactionKey}</span>
                       {payment.providerTransactionId ? <span>PG 거래 ID: {payment.providerTransactionId}</span> : null}
                       <span>{payment.requestedAt}</span>
                       {payment.failureReason ? <span>{payment.failureReason}</span> : null}
                     </div>
-                  )) : <div className="resource-list__item resource-list__item--static"><strong>결제 시도 내역이 없습니다.</strong></div>}
+                  )) : <div className="resource-list__item resource-list__item--static"><strong>결제 시도 이력이 없습니다.</strong></div>}
                 </div>
               </>
             ) : null}

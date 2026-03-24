@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import EmptyState from '../components/common/EmptyState.jsx'
@@ -95,26 +95,9 @@ function ClickableDot({ cx, cy, payload, stroke, onSelect }) {
   }
 
   return (
-    <g
-      style={{ cursor: 'pointer' }}
-      onClick={() => onSelect(payload)}
-    >
-      <circle
-        cx={cx}
-        cy={cy}
-        r={14}
-        fill="transparent"
-        pointerEvents="all"
-      />
-      <circle
-        cx={cx}
-        cy={cy}
-        r={4}
-        fill={stroke}
-        stroke="#ffffff"
-        strokeWidth={2}
-        pointerEvents="none"
-      />
+    <g style={{ cursor: 'pointer' }} onClick={() => onSelect(payload)}>
+      <circle cx={cx} cy={cy} r={14} fill="transparent" pointerEvents="all" />
+      <circle cx={cx} cy={cy} r={4} fill={stroke} stroke="#ffffff" strokeWidth={2} pointerEvents="none" />
     </g>
   )
 }
@@ -136,10 +119,8 @@ function DashboardPage() {
 
       try {
         const response = await interviewApi.listSessions()
-        console.log('[Dashboard] interview sessions response:', response)
         setSessions(normalizeSessions(response))
       } catch (loadError) {
-        console.error('[Dashboard] interview sessions load failed:', loadError)
         setSessions([])
         setError(loadError.message)
       } finally {
@@ -254,50 +235,27 @@ function DashboardPage() {
       }))
   }, [completedInterviewSessions, learningRecords, range])
 
-  const weaknessTags = useMemo(() => {
-    const weakPointText = completedInterviewSessions
-      .map((session) => session.feedback?.weakPoints)
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
+  const interviewTrend = useMemo(
+    () => scoreTrend
+      .filter((point) => Number.isFinite(point.interviewScore))
+      .map((point, index) => ({
+        ...point,
+        score: point.interviewScore,
+        indexLabel: `${index + 1}`,
+      })),
+    [scoreTrend],
+  )
 
-    const tags = []
-    if (weakPointText.includes('구체') || weakPointText.includes('수치') || weakPointText.includes('근거')) {
-      tags.push('구체성 보완')
-    }
-    if (weakPointText.includes('star') || weakPointText.includes('구조') || weakPointText.includes('순서')) {
-      tags.push('답변 구조화')
-    }
-    if (weakPointText.includes('직무') || weakPointText.includes('적합')) {
-      tags.push('직무 연관성')
-    }
-    if (learningRecords.some((record) => Number(record.score) < 70)) {
-      tags.push('학습 오답 복습')
-    }
-
-    return tags.slice(0, 4)
-  }, [completedInterviewSessions, learningRecords])
-
-  const recommendedNextActions = useMemo(() => {
-    const actions = completedInterviewSessions
-      .map((session) => session.feedback?.improvements)
-      .filter(Boolean)
-      .slice(0, 2)
-
-    if (latestLearningScore !== null && latestLearningScore < 70) {
-      actions.push('최근 학습 오답 문제를 먼저 복습하고 다시 풀어보세요.')
-    }
-
-    if (actions.length > 0) {
-      return actions.slice(0, 3)
-    }
-
-    return [
-      '면접 답변은 상황, 행동, 결과 순서로 다시 구조화해 보세요.',
-      '학습 세션에서 틀린 문제를 먼저 복습해 보세요.',
-      '다음 목표를 학습 정답률 80% 이상으로 잡아보세요.',
-    ]
-  }, [completedInterviewSessions, latestLearningScore])
+  const learningTrend = useMemo(
+    () => scoreTrend
+      .filter((point) => Number.isFinite(point.learningScore))
+      .map((point, index) => ({
+        ...point,
+        score: point.learningScore,
+        indexLabel: `${index + 1}`,
+      })),
+    [scoreTrend],
+  )
 
   const recentActivities = useMemo(() => {
     const interviewActivities = completedInterviewSessions
@@ -377,7 +335,7 @@ function DashboardPage() {
       </div>
 
       <div className="button-row">
-        <Link className="button" to="/profile-documents">지원 자료 관리</Link>
+        <Link className="button" to="/profile-documents">지원자료 관리</Link>
         <Link className="button button--secondary" to="/interview/setup">{BUTTON_LABELS.startInterview}</Link>
         <Link className="button button--secondary" to="/learning">{BUTTON_LABELS.startLearning}</Link>
       </div>
@@ -396,12 +354,12 @@ function DashboardPage() {
             ))}
           </section>
 
-          <div className="dashboard-grid">
+          <div className="dashboard-grid dashboard-grid--vertical">
             <section className="panel dashboard-chart-card">
               <div className="panel__header">
                 <div>
                   <h3 className="panel__title">기간별 성과 추이</h3>
-                  <p className="panel__subtitle">면접 점수와 학습 점수를 한 차트에서 비교합니다.</p>
+                  <p className="panel__subtitle">면접과 학습 추이를 분리한 두 개의 그래프로 확인합니다.</p>
                 </div>
               </div>
               <div className="button-row">
@@ -409,88 +367,72 @@ function DashboardPage() {
                 <button className={range === '30D' ? 'button' : 'button button--secondary'} type="button" onClick={() => setRange('30D')}>30D</button>
                 <button className={range === 'ALL' ? 'button' : 'button button--secondary'} type="button" onClick={() => setRange('ALL')}>ALL</button>
               </div>
-              <div className="dashboard-chart">
-                {scoreTrend.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={scoreTrend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(18, 18, 18, 0.08)" />
-                      <XAxis dataKey="indexLabel" tickLine={false} axisLine={false} />
-                      <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={36} />
-                      <Tooltip
-                        labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate ?? label}
-                        formatter={(value, name) => {
-                          const score = typeof value === 'number' ? `${value}점` : value
-                          if (name === 'interviewScore') {
-                            return [score, '면접 점수']
-                          }
-                          if (name === 'learningScore') {
-                            return [score, '학습 점수']
-                          }
-                          return [score, name]
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="interviewScore"
-                        stroke="#2563EB"
-                        strokeWidth={2.5}
-                        dot={(props) => <ClickableDot {...props} onSelect={handleTrendPointSelect} />}
-                        activeDot={{ r: 6 }}
-                        connectNulls={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="learningScore"
-                        stroke="#16A34A"
-                        strokeWidth={2.5}
-                        dot={(props) => <ClickableDot {...props} onSelect={handleTrendPointSelect} />}
-                        activeDot={{ r: 6 }}
-                        connectNulls={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState title="아직 표시할 데이터가 없습니다." description="면접이나 학습을 완료하면 추이 차트가 표시됩니다." />
-                )}
-              </div>
               {scoreTrend.length > 0 ? (
-                <p className="panel__subtitle">차트의 점수를 누르면 해당 면접 결과 또는 학습 결과 화면으로 이동합니다.</p>
-              ) : null}
-            </section>
+                <div className="dashboard-trend-grid">
+                  <article className="panel dashboard-trend-panel">
+                    <div className="panel__header">
+                      <div>
+                        <h4 className="panel__title">면접 점수 추이</h4>
+                      </div>
+                    </div>
+                    <div className="dashboard-chart">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={interviewTrend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(18, 18, 18, 0.08)" />
+                          <XAxis dataKey="indexLabel" tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={36} />
+                          <Tooltip
+                            labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate ?? label}
+                            formatter={(value) => [typeof value === 'number' ? `${value}점` : value, '면접 점수']}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="score"
+                            stroke="#2563EB"
+                            strokeWidth={2.5}
+                            dot={(props) => <ClickableDot {...props} onSelect={handleTrendPointSelect} />}
+                            activeDot={{ r: 6 }}
+                            connectNulls={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </article>
 
-            <section className="panel">
-              <div className="panel__header">
-                <div>
-                  <h3 className="panel__title">보완 포인트</h3>
-                  <p className="panel__subtitle">최근 결과를 바탕으로 반복되는 보완 포인트를 정리했습니다.</p>
-                </div>
-              </div>
-              {weaknessTags.length > 0 ? (
-                <div className="tag-list">
-                  {weaknessTags.map((tag) => (
-                    <span key={tag} className="dashboard-tag">{tag}</span>
-                  ))}
+                  <article className="panel dashboard-trend-panel">
+                    <div className="panel__header">
+                      <div>
+                        <h4 className="panel__title">학습 점수 추이</h4>
+                      </div>
+                    </div>
+                    <div className="dashboard-chart">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={learningTrend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(18, 18, 18, 0.08)" />
+                          <XAxis dataKey="indexLabel" tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={36} />
+                          <Tooltip
+                            labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate ?? label}
+                            formatter={(value) => [typeof value === 'number' ? `${value}점` : value, '학습 점수']}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="score"
+                            stroke="#16A34A"
+                            strokeWidth={2.5}
+                            dot={(props) => <ClickableDot {...props} onSelect={handleTrendPointSelect} />}
+                            activeDot={{ r: 6 }}
+                            connectNulls={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </article>
                 </div>
               ) : (
-                <EmptyState title="보완 포인트가 아직 없습니다." description="면접 결과가 쌓이면 자동으로 분석합니다." />
+                <EmptyState title="아직 표시할 데이터가 없습니다." description="면접이나 학습을 완료하면 추이 차트가 표시됩니다." />
               )}
-            </section>
-
-            <section className="panel dashboard-recommend-card">
-              <div className="panel__header">
-                <div>
-                  <h3 className="panel__title">다음 추천 작업</h3>
-                  <p className="panel__subtitle">현재 기록을 기준으로 우선순위가 높은 작업입니다.</p>
-                </div>
-              </div>
-              <div className="dashboard-action-list">
-                {recommendedNextActions.map((action) => (
-                  <article key={action} className="dashboard-action-item">
-                    <strong>추천 항목</strong>
-                    <p>{action}</p>
-                  </article>
-                ))}
-              </div>
+              {scoreTrend.length > 0 ? <p className="panel__subtitle">차트의 점수를 누르면 해당 결과 화면으로 이동합니다.</p> : null}
             </section>
 
             <section className="panel dashboard-recent-card">
@@ -539,7 +481,7 @@ function DashboardPage() {
                           </span>
                         </div>
                         <p className="dashboard-session-item__meta">
-                          {`${formatShortDate(session.startedAt)} · ${session.positionTitle || '직무 미설정'}`}
+                          {`${formatShortDate(session.startedAt)} · ${session.positionTitle || '직무 미선택'}`}
                         </p>
                         <div className="button-row">
                           <Link

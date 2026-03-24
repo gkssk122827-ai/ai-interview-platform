@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import EmptyState from '../components/common/EmptyState.jsx'
 import ErrorBlock from '../components/common/ErrorBlock.jsx'
 import LoadingBlock from '../components/common/LoadingBlock.jsx'
@@ -41,19 +42,23 @@ function JobPostingPage() {
     <section className="workspace-page">
       <div className="workspace-page__hero">
         <p className="page-card__eyebrow">채용공고</p>
-        <h2 className="page-card__title">등록된 채용공고를 조회하고 면접 준비에 활용하세요.</h2>
-        <p className="page-card__description">채용공고 등록과 수정은 관리자 페이지에서만 가능합니다. 일반 회원은 공고를 조회하고 면접 설정에 활용할 수 있습니다.</p>
+        <h2 className="page-card__title">등록된 채용공고를 확인하고 면접 준비에 활용하세요.</h2>
+        <p className="page-card__description">상세보기에서 공고 정보를 확인한 뒤 면접 설정으로 이동할 수 있습니다.</p>
       </div>
 
       <article className="panel panel--wide">
         <div className="panel__header">
           <div>
             <h3 className="panel__title">채용공고 목록</h3>
-            <p className="panel__subtitle">회사명, 사이트명, 마감일, 링크 정보를 확인할 수 있습니다.</p>
+            <p className="panel__subtitle">회사명, 직무, 마감일, 원본 링크 정보를 확인할 수 있습니다.</p>
           </div>
         </div>
+
         {items.length === 0 ? (
-          <EmptyState title="등록된 채용공고가 없습니다." description="관리자 페이지에서 채용공고를 등록하면 이곳에 표시됩니다." />
+          <EmptyState
+            title="등록된 채용공고가 없습니다."
+            description="관리자 페이지에서 채용공고를 등록하면 이곳에 표시됩니다."
+          />
         ) : (
           <div className="resource-list">
             {items.map((item) => (
@@ -62,6 +67,9 @@ function JobPostingPage() {
                 <span>{item.companyName} · {item.siteName || '수동입력'}</span>
                 <span>{item.deadline ? `마감일 ${item.deadline}` : '마감일 미정'}</span>
                 <span>{item.jobUrl || '링크 없음'}</span>
+                <div className="button-row">
+                  <Link className="button button--secondary" to={`/job-posting/${item.id}`}>상세보기</Link>
+                </div>
               </div>
             ))}
           </div>
