@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+﻿import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import EmptyState from '../components/common/EmptyState.jsx'
 import ErrorBlock from '../components/common/ErrorBlock.jsx'
@@ -81,9 +81,31 @@ function readLearningRecords() {
   }
 }
 
-function DashboardPage() {
-  usePageTitle('\uB300\uC2DC\uBCF4\uB4DC')
+function normalizeSessions(payload) {
+  if (!Array.isArray(payload)) {
+    return []
+  }
 
+  return payload.filter(Boolean)
+}
+
+function ClickableDot({ cx, cy, payload, stroke, onSelect }) {
+  if (!payload || !Number.isFinite(cx) || !Number.isFinite(cy)) {
+    return null
+  }
+
+  return (
+    <g style={{ cursor: 'pointer' }} onClick={() => onSelect(payload)}>
+      <circle cx={cx} cy={cy} r={14} fill="transparent" pointerEvents="all" />
+      <circle cx={cx} cy={cy} r={4} fill={stroke} stroke="#ffffff" strokeWidth={2} pointerEvents="none" />
+    </g>
+  )
+}
+
+function DashboardPage() {
+  usePageTitle('대시보드')
+
+  const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const [sessions, setSessions] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -97,8 +119,9 @@ function DashboardPage() {
 
       try {
         const response = await interviewApi.listSessions()
-        setSessions(response ?? [])
+        setSessions(normalizeSessions(response))
       } catch (loadError) {
+        setSessions([])
         setError(loadError.message)
       } finally {
         setIsLoading(false)
@@ -109,35 +132,29 @@ function DashboardPage() {
   }, [])
 
   const learningRecords = useMemo(() => readLearningRecords(), [])
+  const sessionList = useMemo(() => normalizeSessions(sessions), [sessions])
 
   const completedInterviewSessions = useMemo(
-    () => sessions.filter((session) => session.status === 'COMPLETED'),
-    [sessions],
+    () => sessionList.filter((session) => session.status === 'COMPLETED'),
+    [sessionList],
   )
 
-  const recentInterviewSessions = useMemo(() => sessions.slice(0, 5), [sessions])
+  const recentInterviewSessions = useMemo(
+    () => [...sessionList].sort((left, right) => new Date(right.startedAt ?? 0) - new Date(left.startedAt ?? 0)).slice(0, 5),
+    [sessionList],
+  )
 
   const latestInterviewScore = useMemo(() => {
     const latestSession = [...completedInterviewSessions]
       .filter((session) => Number.isFinite(Number(session.feedback?.overallScore)))
       .sort((left, right) => new Date(right.endedAt ?? right.startedAt) - new Date(left.endedAt ?? left.startedAt))[0]
 
-    if (!latestSession) {
-      return null
-    }
-
-    return Number(latestSession.feedback?.overallScore)
+    return latestSession ? Number(latestSession.feedback?.overallScore) : null
   }, [completedInterviewSessions])
 
   const latestLearningScore = useMemo(() => {
-    const latestRecord = [...learningRecords]
-      .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0]
-
-    if (!latestRecord) {
-      return null
-    }
-
-    return Number(latestRecord.score)
+    const latestRecord = [...learningRecords].sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0]
+    return latestRecord ? Number(latestRecord.score) : null
   }, [learningRecords])
 
   const learningStreak = useMemo(() => {
@@ -177,13 +194,13 @@ function DashboardPage() {
 
         return {
           id: `interview-${session.id}`,
+          sessionId: session.id,
           timestamp,
           date: formatShortDate(endedAt),
           fullDate: formatFullDate(endedAt),
           interviewScore: score,
           learningScore: null,
-          type: '\uBA74\uC811',
-          title: session.title || session.positionTitle || '\uBA74\uC811 \uC138\uC158',
+          title: session.title || session.positionTitle || '면접 세션',
         }
       })
       .filter(Boolean)
@@ -197,71 +214,48 @@ function DashboardPage() {
 
         return {
           id: `learning-${record.id}`,
+          resultId: record.id,
           timestamp,
           date: formatShortDate(record.completedAt),
           fullDate: formatFullDate(record.completedAt),
           interviewScore: null,
           learningScore: Number(record.score),
-          type: '\uD559\uC2B5',
-          title: `\uD559\uC2B5 ${record.correctCount}/${record.totalCount}`,
+          title: `학습 ${record.correctCount}/${record.totalCount}`,
         }
       })
       .filter(Boolean)
 
-    const points = [...interviewPoints, ...learningPoints]
+    return [...interviewPoints, ...learningPoints]
       .sort((left, right) => left.timestamp - right.timestamp)
       .filter((point) => (minTimestamp === null ? true : point.timestamp >= minTimestamp))
       .slice(-50)
-
-    return points.map((point, index) => ({
-      ...point,
-      indexLabel: `${index + 1}`,
-    }))
+      .map((point, index) => ({
+        ...point,
+        indexLabel: `${index + 1}`,
+      }))
   }, [completedInterviewSessions, learningRecords, range])
 
-  const weaknessTags = useMemo(() => {
-    const source = completedInterviewSessions
-      .map((session) => session.feedback?.weakPoints)
-      .filter(Boolean)
-      .join(' ')
+  const interviewTrend = useMemo(
+    () => scoreTrend
+      .filter((point) => Number.isFinite(point.interviewScore))
+      .map((point, index) => ({
+        ...point,
+        score: point.interviewScore,
+        indexLabel: `${index + 1}`,
+      })),
+    [scoreTrend],
+  )
 
-    const tags = []
-    if (source.includes('\uAD6C\uCCB4') || source.includes('\uC218\uCE58') || source.includes('\uC9C0\uD45C')) {
-      tags.push('\uAD6C\uCCB4\uC131')
-    }
-    if (source.includes('STAR') || source.includes('\uAD6C\uC870') || source.includes('\uC21C\uC11C')) {
-      tags.push('\uB2F5\uBCC0 \uAD6C\uC870')
-    }
-    if (source.includes('\uC9C1\uBB34') || source.includes('\uC801\uD569')) {
-      tags.push('\uC9C1\uBB34 \uC801\uD569\uC131')
-    }
-    if (learningRecords.some((record) => Number(record.score) < 70)) {
-      tags.push('\uD559\uC2B5 \uC815\uB2F5\uB960')
-    }
-
-    return tags.slice(0, 4)
-  }, [completedInterviewSessions, learningRecords])
-
-  const recommendedNextActions = useMemo(() => {
-    const actions = completedInterviewSessions
-      .map((session) => session.feedback?.improvements)
-      .filter(Boolean)
-      .slice(0, 2)
-
-    if (latestLearningScore !== null && latestLearningScore < 70) {
-      actions.push('\uCD5C\uADFC \uD559\uC2B5 \uC624\uB2F5 \uBB38\uC81C\uB97C \uBA3C\uC800 \uBCF5\uC2B5\uD558\uACE0 \uB2E4\uC2DC \uD480\uC5B4\uBCF4\uC138\uC694.')
-    }
-
-    if (actions.length > 0) {
-      return actions.slice(0, 3)
-    }
-
-    return [
-      '\uBA74\uC811 \uB2F5\uBCC0\uC740 \uC0C1\uD669-\uD589\uB3D9-\uACB0\uACFC \uC21C\uC11C\uB85C \uC7AC\uAD6C\uC131\uD574 \uC5F0\uC2B5\uD574\uBCF4\uC138\uC694.',
-      '\uD559\uC2B5 \uC138\uC158\uC5D0\uC11C \uD2C0\uB9B0 \uBB38\uC81C\uB97C \uC624\uB2F5\uB178\uD2B8\uB85C \uBA3C\uC800 \uBCF5\uC2B5\uD558\uC138\uC694.',
-      '\uB2E4\uC74C \uBAA9\uD45C\uB294 \uD559\uC2B5 \uC815\uB2F5\uB960 80% \uC774\uC0C1\uC73C\uB85C \uC124\uC815\uD574\uBCF4\uC138\uC694.',
-    ]
-  }, [completedInterviewSessions, latestLearningScore])
+  const learningTrend = useMemo(
+    () => scoreTrend
+      .filter((point) => Number.isFinite(point.learningScore))
+      .map((point, index) => ({
+        ...point,
+        score: point.learningScore,
+        indexLabel: `${index + 1}`,
+      })),
+    [scoreTrend],
+  )
 
   const recentActivities = useMemo(() => {
     const interviewActivities = completedInterviewSessions
@@ -276,8 +270,8 @@ function DashboardPage() {
         return {
           id: `activity-interview-${session.id}`,
           timestamp,
-          label: '\uBA74\uC811',
-          title: session.title || session.positionTitle || '\uBA74\uC811 \uC138\uC158',
+          label: '면접',
+          title: session.title || session.positionTitle || '면접 세션',
           meta: formatFullDate(endedAt),
           score,
         }
@@ -294,8 +288,8 @@ function DashboardPage() {
         return {
           id: `activity-learning-${record.id}`,
           timestamp,
-          label: '\uD559\uC2B5',
-          title: `\uD559\uC2B5 ${record.correctCount}/${record.totalCount}`,
+          label: '학습',
+          title: `학습 ${record.correctCount}/${record.totalCount}`,
           meta: formatFullDate(record.completedAt),
           score: Number(record.score),
         }
@@ -308,40 +302,40 @@ function DashboardPage() {
   }, [completedInterviewSessions, learningRecords])
 
   const scoreCards = useMemo(() => ([
-    {
-      label: '\uCD1D \uBA74\uC811 \uD69F\uC218',
-      value: `${sessions.length}\uD68C`,
-    },
-    {
-      label: '\uCD1D \uD559\uC2B5 \uC138\uC158',
-      value: `${learningRecords.length}\uD68C`,
-    },
-    {
-      label: '\uCD5C\uADFC \uBA74\uC811 \uC810\uC218',
-      value: latestInterviewScore === null ? '-' : `${latestInterviewScore}\uC810`,
-    },
-    {
-      label: '\uCD5C\uADFC \uD559\uC2B5 \uC810\uC218',
-      value: latestLearningScore === null ? '-' : `${latestLearningScore}\uC810`,
-    },
-    {
-      label: '\uC5F0\uC18D \uD559\uC2B5 \uC77C\uC218',
-      value: `${learningStreak}\uC77C`,
-    },
-  ]), [sessions.length, learningRecords.length, latestInterviewScore, latestLearningScore, learningStreak])
+    { label: '총 면접 횟수', value: `${sessionList.length}회` },
+    { label: '총 학습 세션', value: `${learningRecords.length}회` },
+    { label: '최근 면접 점수', value: latestInterviewScore === null ? '-' : `${latestInterviewScore}점` },
+    { label: '최근 학습 점수', value: latestLearningScore === null ? '-' : `${latestLearningScore}점` },
+    { label: '연속 학습 일수', value: `${learningStreak}일` },
+  ]), [sessionList.length, learningRecords.length, latestInterviewScore, latestLearningScore, learningStreak])
+
+  function handleTrendPointSelect(point) {
+    if (!point) {
+      return
+    }
+
+    if (point.sessionId) {
+      navigate(`/interview/result?sessionId=${point.sessionId}`)
+      return
+    }
+
+    if (point.resultId) {
+      navigate(`/learning/result?resultId=${point.resultId}`)
+    }
+  }
 
   return (
     <section className="workspace-page">
-      <div className="workspace-page__hero">
-        <p className="page-card__eyebrow">{`\uC0AC\uC6A9\uC790 \uB300\uC2DC\uBCF4\uB4DC`}</p>
-        <h2 className="page-card__title">{`\uC548\uB155\uD558\uC138\uC694, ${user?.name ?? user?.email ?? '\uC0AC\uC6A9\uC790'}\uB2D8`}</h2>
+      <div className="workspace-page__hero dashboard-hero">
+        <p className="page-card__eyebrow">사용자 대시보드</p>
+        <h2 className="page-card__title dashboard-greeting-title">{`안녕하세요, ${user?.name ?? user?.email ?? '사용자'}님`}</h2>
         <p className="page-card__description">
-          {'\uBA74\uC811\uACFC \uD559\uC2B5 \uC810\uC218\uB97C \uD68C\uCC28\uBCC4\uB85C \uD655\uC778\uD558\uACE0, \uB2E4\uC74C \uD560 \uC77C\uC744 \uBC14\uB85C \uC9C4\uD589\uD574\uBCF4\uC138\uC694.'}
+          면접과 학습 점수를 한눈에 확인하고, 다음 액션을 바로 이어서 진행해 보세요.
         </p>
       </div>
 
       <div className="button-row">
-        <Link className="button" to="/profile-documents">{'\uC9C0\uC6D0\uC790\uB8CC \uAD00\uB9AC'}</Link>
+        <Link className="button" to="/profile-documents">지원자료 관리</Link>
         <Link className="button button--secondary" to="/interview/setup">{BUTTON_LABELS.startInterview}</Link>
         <Link className="button button--secondary" to="/learning">{BUTTON_LABELS.startLearning}</Link>
       </div>
@@ -360,12 +354,12 @@ function DashboardPage() {
             ))}
           </section>
 
-          <div className="dashboard-grid">
+          <div className="dashboard-grid dashboard-grid--vertical">
             <section className="panel dashboard-chart-card">
               <div className="panel__header">
                 <div>
-                  <h3 className="panel__title">{'\uD68C\uCC28\uBCC4 \uC131\uACFC \uCD94\uC774 (\uBA74\uC811/\uD559\uC2B5)'}</h3>
-                  <p className="panel__subtitle">{'\uAC19\uC740 \uADF8\uB798\uD504\uC5D0 \uBA74\uC811\uACFC \uD559\uC2B5 \uC810\uC218\uB97C \uC0C9\uC0C1\uC73C\uB85C \uAD6C\uBD84\uD574 \uD45C\uC2DC\uD569\uB2C8\uB2E4.'}</p>
+                  <h3 className="panel__title">기간별 성과 추이</h3>
+                  <p className="panel__subtitle">면접과 학습 추이를 분리한 두 개의 그래프로 확인합니다.</p>
                 </div>
               </div>
               <div className="button-row">
@@ -373,98 +367,79 @@ function DashboardPage() {
                 <button className={range === '30D' ? 'button' : 'button button--secondary'} type="button" onClick={() => setRange('30D')}>30D</button>
                 <button className={range === 'ALL' ? 'button' : 'button button--secondary'} type="button" onClick={() => setRange('ALL')}>ALL</button>
               </div>
-              <div className="dashboard-chart">
-                {scoreTrend.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={scoreTrend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(18, 18, 18, 0.08)" />
-                      <XAxis dataKey="indexLabel" tickLine={false} axisLine={false} />
-                      <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={36} />
-                      <Tooltip
-                        labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate ?? label}
-                        formatter={(value, name) => {
-                          const score = typeof value === 'number' ? `${value}\uC810` : value
-                          if (name === 'interviewScore') {
-                            return [score, '\uBA74\uC811 \uC810\uC218']
-                          }
-                          if (name === 'learningScore') {
-                            return [score, '\uD559\uC2B5 \uC810\uC218']
-                          }
-                          return [score, name]
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="interviewScore"
-                        stroke="#2563EB"
-                        strokeWidth={2.5}
-                        dot={{ r: 4, fill: '#2563EB' }}
-                        activeDot={{ r: 6 }}
-                        connectNulls={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="learningScore"
-                        stroke="#16A34A"
-                        strokeWidth={2.5}
-                        dot={{ r: 4, fill: '#16A34A' }}
-                        activeDot={{ r: 6 }}
-                        connectNulls={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState
-                    title={'\uD45C\uC2DC\uD560 \uC810\uC218 \uB370\uC774\uD130\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.'}
-                    description={'\uBA74\uC811\uC744 \uC644\uB8CC\uD558\uACE0 \uD559\uC2B5\uC744 \uC9C4\uD589\uD558\uBA74 \uD68C\uCC28\uBCC4 \uCD94\uC774\uB97C \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}
-                  />
-                )}
-              </div>
-            </section>
+              {scoreTrend.length > 0 ? (
+                <div className="dashboard-trend-grid">
+                  <article className="panel dashboard-trend-panel">
+                    <div className="panel__header">
+                      <div>
+                        <h4 className="panel__title">면접 점수 추이</h4>
+                      </div>
+                    </div>
+                    <div className="dashboard-chart">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={interviewTrend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(18, 18, 18, 0.08)" />
+                          <XAxis dataKey="indexLabel" tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={36} />
+                          <Tooltip
+                            labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate ?? label}
+                            formatter={(value) => [typeof value === 'number' ? `${value}점` : value, '면접 점수']}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="score"
+                            stroke="#2563EB"
+                            strokeWidth={2.5}
+                            dot={(props) => <ClickableDot {...props} onSelect={handleTrendPointSelect} />}
+                            activeDot={{ r: 6 }}
+                            connectNulls={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </article>
 
-            <section className="panel">
-              <div className="panel__header">
-                <div>
-                  <h3 className="panel__title">{'\uBCF4\uC644 \uC0AC\uC778'}</h3>
-                  <p className="panel__subtitle">{'\uCD5C\uADFC \uAE30\uB85D\uC5D0\uC11C \uBC18\uBCF5\uB418\uB294 \uAC1C\uC120 \uD3EC\uC778\uD2B8\uC785\uB2C8\uB2E4.'}</p>
-                </div>
-              </div>
-              {weaknessTags.length > 0 ? (
-                <div className="tag-list">
-                  {weaknessTags.map((tag) => (
-                    <span key={tag} className="dashboard-tag">{tag}</span>
-                  ))}
+                  <article className="panel dashboard-trend-panel">
+                    <div className="panel__header">
+                      <div>
+                        <h4 className="panel__title">학습 점수 추이</h4>
+                      </div>
+                    </div>
+                    <div className="dashboard-chart">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={learningTrend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(18, 18, 18, 0.08)" />
+                          <XAxis dataKey="indexLabel" tickLine={false} axisLine={false} />
+                          <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={36} />
+                          <Tooltip
+                            labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate ?? label}
+                            formatter={(value) => [typeof value === 'number' ? `${value}점` : value, '학습 점수']}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="score"
+                            stroke="#16A34A"
+                            strokeWidth={2.5}
+                            dot={(props) => <ClickableDot {...props} onSelect={handleTrendPointSelect} />}
+                            activeDot={{ r: 6 }}
+                            connectNulls={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </article>
                 </div>
               ) : (
-                <EmptyState
-                  title={'\uBCF4\uC644 \uC0AC\uC778\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}
-                  description={'\uCD94\uAC00 \uC138\uC158\uC744 \uC9C4\uD589\uD558\uBA74 \uC790\uB3D9\uC73C\uB85C \uBD84\uC11D\uB429\uB2C8\uB2E4.'}
-                />
+                <EmptyState title="아직 표시할 데이터가 없습니다." description="면접이나 학습을 완료하면 추이 차트가 표시됩니다." />
               )}
-            </section>
-
-            <section className="panel dashboard-recommend-card">
-              <div className="panel__header">
-                <div>
-                  <h3 className="panel__title">{'\uB2E4\uC74C \uCD94\uCC9C \uC791\uC5C5'}</h3>
-                  <p className="panel__subtitle">{'\uD604\uC7AC \uAE30\uB85D \uAE30\uBC18 \uCD5C\uC6B0\uC120 \uC791\uC5C5\uC785\uB2C8\uB2E4.'}</p>
-                </div>
-              </div>
-              <div className="dashboard-action-list">
-                {recommendedNextActions.map((action) => (
-                  <article key={action} className="dashboard-action-item">
-                    <strong>{'\uCD94\uCC9C \uD56D\uBAA9'}</strong>
-                    <p>{action}</p>
-                  </article>
-                ))}
-              </div>
+              {scoreTrend.length > 0 ? <p className="panel__subtitle">차트의 점수를 누르면 해당 결과 화면으로 이동합니다.</p> : null}
             </section>
 
             <section className="panel dashboard-recent-card">
               <div className="panel__header">
                 <div>
-                  <h3 className="panel__title">{'\uCD5C\uADFC \uD65C\uB3D9 \uD0C0\uC784\uB77C\uC778'}</h3>
-                  <p className="panel__subtitle">{'\uBA74\uC811\uACFC \uD559\uC2B5 \uAE30\uB85D\uC744 \uD568\uAED8 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}</p>
+                  <h3 className="panel__title">최근 활동 타임라인</h3>
+                  <p className="panel__subtitle">면접과 학습 기록을 최신순으로 보여줍니다.</p>
                 </div>
               </div>
               {recentActivities.length > 0 ? (
@@ -473,25 +448,22 @@ function DashboardPage() {
                     <article key={activity.id} className="dashboard-session-item">
                       <div className="dashboard-session-item__row">
                         <strong>{activity.title}</strong>
-                        <span className="dashboard-score-chip">{`${activity.label} ${activity.score}\uC810`}</span>
+                        <span className="dashboard-score-chip">{`${activity.label} ${activity.score}점`}</span>
                       </div>
                       <p className="dashboard-session-item__meta">{activity.meta}</p>
                     </article>
                   ))}
                 </div>
               ) : (
-                <EmptyState
-                  title={'\uCD5C\uADFC \uD65C\uB3D9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}
-                  description={'\uBA74\uC811 \uB610\uB294 \uD559\uC2B5\uC744 \uC9C4\uD589\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uC790\uB3D9 \uD45C\uC2DC\uB429\uB2C8\uB2E4.'}
-                />
+                <EmptyState title="최근 활동이 없습니다." description="면접 또는 학습을 진행하면 여기에 바로 반영됩니다." />
               )}
             </section>
 
             <section className="panel">
               <div className="panel__header">
                 <div>
-                  <h3 className="panel__title">{'\uCD5C\uADFC \uBA74\uC811 \uC138\uC158'}</h3>
-                  <p className="panel__subtitle">{'\uAC01 \uC138\uC158\uC758 \uC810\uC218\uC640 \uC0C1\uD0DC\uB97C \uBC14\uB85C \uD655\uC778\uD569\uB2C8\uB2E4.'}</p>
+                  <h3 className="panel__title">최근 면접 세션</h3>
+                  <p className="panel__subtitle">최근 세션의 상태와 결과를 빠르게 확인할 수 있습니다.</p>
                 </div>
               </div>
               {recentInterviewSessions.length > 0 ? (
@@ -503,20 +475,20 @@ function DashboardPage() {
                     return (
                       <article key={session.id} className="dashboard-session-item">
                         <div className="dashboard-session-item__row">
-                          <strong>{session.title || session.positionTitle || '\uBA74\uC811 \uC138\uC158'}</strong>
+                          <strong>{session.title || session.positionTitle || '면접 세션'}</strong>
                           <span className="dashboard-score-chip">
-                            {score > 0 ? `\uC810\uC218 ${score}` : '\uACB0\uACFC \uB300\uAE30'}
+                            {score > 0 ? `점수 ${score}` : session.status}
                           </span>
                         </div>
                         <p className="dashboard-session-item__meta">
-                          {`${formatShortDate(session.startedAt)} \u00B7 ${session.positionTitle || '\uC9C1\uBB34 \uBBF8\uC124\uC815'}`}
+                          {`${formatShortDate(session.startedAt)} · ${session.positionTitle || '직무 미선택'}`}
                         </p>
                         <div className="button-row">
                           <Link
                             className="button button--secondary"
                             to={isCompleted ? `/interview/result?sessionId=${session.id}` : `/interview/session?sessionId=${session.id}`}
                           >
-                            {isCompleted ? '\uACB0\uACFC \uBCF4\uAE30' : '\uC774\uC5B4\uC11C \uC9C4\uD589'}
+                            {isCompleted ? '결과 보기' : '이어서 진행'}
                           </Link>
                         </div>
                       </article>
@@ -524,10 +496,7 @@ function DashboardPage() {
                   })}
                 </div>
               ) : (
-                <EmptyState
-                  title={'\uCD5C\uADFC \uBA74\uC811 \uC138\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}
-                  description={'\uBAA8\uC758\uBA74\uC811\uC744 \uC2DC\uC791\uD558\uBA74 \uC5EC\uAE30\uC5D0 \uC138\uC158\uC774 \uB204\uC801\uB429\uB2C8\uB2E4.'}
-                />
+                <EmptyState title="최근 면접 세션이 없습니다." description="모의면접을 시작하면 대시보드에 바로 반영됩니다." />
               )}
             </section>
           </div>

@@ -32,7 +32,7 @@ const defaultPositionOptions = [
 function InterviewSetupPage() {
   usePageTitle('면접 설정')
   const navigate = useNavigate()
-  const [mode, setMode] = useState('COMPREHENSIVE')
+  const [mode, setMode] = useState('RESUME_BASED')
   const [title, setTitle] = useState('지원자료 기반 모의면접')
   const [positionTitle, setPositionTitle] = useState('')
   const [documents, setDocuments] = useState([])

@@ -50,6 +50,7 @@ public class PythonAiService implements AiService {
                             context.questionIndex(),
                             context.totalQuestionCount(),
                             context.modeGuide(),
+                            context.materialHighlights(),
                             context.existingQuestions(),
                             history
                     )),
@@ -120,6 +121,7 @@ public class PythonAiService implements AiService {
             int questionIndex,
             int totalQuestionCount,
             String modeGuide,
+            List<String> materialHighlights,
             List<String> existingQuestions,
             List<ConversationTurnDto> conversationHistory
     ) {

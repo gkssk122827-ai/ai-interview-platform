@@ -3,7 +3,9 @@ package com.aimentor.domain.profile.controller;
 import com.aimentor.common.api.ApiResponse;
 import com.aimentor.common.security.AuthenticatedUser;
 import com.aimentor.domain.profile.dto.request.JobPostingUpsertRequest;
+import com.aimentor.domain.profile.dto.request.JobPostingUrlRegisterRequest;
 import com.aimentor.domain.profile.dto.response.JobPostingResponse;
+import com.aimentor.domain.profile.dto.response.JobPostingUrlPreviewResponse;
 import com.aimentor.domain.profile.service.JobPostingService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -38,16 +40,18 @@ public class JobPostingController {
 
     @GetMapping
     public ApiResponse<List<JobPostingResponse>> list(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestParam(required = false) String keyword
     ) {
-        return ApiResponse.success(jobPostingService.list(keyword));
+        return ApiResponse.success(jobPostingService.list(authenticatedUser.role(), authenticatedUser.userId(), keyword));
     }
 
     @GetMapping("/{jobPostingId}")
     public ApiResponse<JobPostingResponse> get(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long jobPostingId
     ) {
-        return ApiResponse.success(jobPostingService.get(jobPostingId));
+        return ApiResponse.success(jobPostingService.get(authenticatedUser.role(), authenticatedUser.userId(), jobPostingId));
     }
 
     @PutMapping("/{jobPostingId}")
@@ -56,7 +60,7 @@ public class JobPostingController {
             @PathVariable Long jobPostingId,
             @Valid @RequestBody JobPostingUpsertRequest request
     ) {
-        return ApiResponse.success(jobPostingService.update(authenticatedUser.role(), jobPostingId, request));
+        return ApiResponse.success(jobPostingService.update(authenticatedUser.role(), authenticatedUser.userId(), jobPostingId, request));
     }
 
     @DeleteMapping("/{jobPostingId}")
@@ -64,7 +68,12 @@ public class JobPostingController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long jobPostingId
     ) {
-        jobPostingService.delete(authenticatedUser.role(), jobPostingId);
+        jobPostingService.delete(authenticatedUser.role(), authenticatedUser.userId(), jobPostingId);
         return ApiResponse.success();
+    }
+
+    @PostMapping("/preview")
+    public ApiResponse<JobPostingUrlPreviewResponse> previewUrl(@Valid @RequestBody JobPostingUrlRegisterRequest request) {
+        return ApiResponse.success(jobPostingService.previewUrl(request.url()));
     }
 }

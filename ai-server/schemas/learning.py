@@ -13,8 +13,8 @@ class LearningProblem(BaseModel):
     @model_validator(mode="after")
     def validate_problem_shape(self) -> "LearningProblem":
         if self.type == "MULTIPLE":
-            if not self.choices or len(self.choices) != 4:
-                raise ValueError("MULTIPLE problems must include exactly 4 choices.")
+            if not self.choices or len(self.choices) != 5:
+                raise ValueError("MULTIPLE problems must include exactly 5 choices.")
             if self.answer not in self.choices:
                 raise ValueError("MULTIPLE problem answers must match one of the choices.")
         if self.type == "SHORT" and self.choices is not None:

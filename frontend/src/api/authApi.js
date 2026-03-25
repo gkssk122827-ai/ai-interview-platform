@@ -15,7 +15,9 @@ function normalizeAuthPayload(payload) {
       id: payload.user?.id ?? payload.userId,
       name: payload.user?.name ?? payload.name ?? payload.email,
       email: payload.user?.email ?? payload.email,
+      phone: payload.user?.phone ?? payload.phone ?? '',
       role: payload.user?.role ?? payload.role,
+      status: payload.user?.status ?? payload.status ?? 'ACTIVE',
     },
     accessToken: payload.accessToken,
     accessTokenExpiresAt: payload.accessTokenExpiresAt ?? null,
@@ -79,6 +81,39 @@ const authApi = {
     }
 
     clearAuthSession()
+  },
+
+  async getMe() {
+    try {
+      const response = await apiClient.get('/auth/me')
+      return extractPayload(response)
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, '내 정보를 불러오는 중 오류가 발생했습니다.'))
+    }
+  },
+
+  async updateMe(payload) {
+    try {
+      const response = await apiClient.put('/auth/me', payload)
+      const result = extractPayload(response)
+      const session = getStoredAuthSession()
+      if (session) {
+        persistAuthSession({
+          ...session,
+          user: {
+            ...session.user,
+            name: result.name,
+            email: result.email,
+            phone: result.phone,
+            role: result.role,
+            status: result.status,
+          },
+        })
+      }
+      return result
+    } catch (error) {
+      throw new Error(extractApiErrorMessage(error, '회원 정보를 수정하는 중 오류가 발생했습니다.'))
+    }
   },
 }
 

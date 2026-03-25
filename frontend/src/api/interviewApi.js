@@ -5,9 +5,39 @@ import { difficultyPlan, stubQuestionTemplates } from './interviewStubQuestions.
 const useStubApi = import.meta.env.VITE_USE_API_STUB === 'true'
 const stubSessionStore = new Map()
 
+function normalizeSessionListPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+  if (Array.isArray(payload?.sessions)) {
+    return payload.sessions
+  }
+  if (Array.isArray(payload?.content)) {
+    return payload.content
+  }
+  return []
+}
+
 function resolveRole(positionTitle = '') {
   const normalized = positionTitle.toLowerCase()
-  if (normalized.includes('front') || normalized.includes('frontend') || normalized.includes('react') || normalized.includes('ui') || normalized.includes('프론트')) {
+  if (
+    normalized.includes('front')
+    || normalized.includes('frontend')
+    || normalized.includes('front-end')
+    || normalized.includes('react')
+    || normalized.includes('next')
+    || normalized.includes('vue')
+    || normalized.includes('angular')
+    || normalized.includes('javascript')
+    || normalized.includes('typescript')
+    || normalized.includes('html')
+    || normalized.includes('css')
+    || normalized.includes('ui')
+    || normalized.includes('web')
+    || normalized.includes('프론트')
+    || normalized.includes('프론트엔드')
+    || normalized.includes('웹')
+  ) {
     return 'FRONTEND'
   }
   return 'BACKEND'
@@ -217,7 +247,7 @@ const interviewApi = {
 
     try {
       const response = await apiClient.get('/interviews/sessions')
-      return extractPayload(response) ?? []
+      return normalizeSessionListPayload(extractPayload(response))
     } catch (error) {
       throw new Error(extractApiErrorMessage(error, '면접 세션 목록을 불러오는 중 오류가 발생했습니다.'))
     }

@@ -130,6 +130,25 @@ class ProfileDocumentIntegrationTest {
                 .andExpect(jsonPath("$.data.fileUrl").value("https://example.com/job-posting-v2.pdf"));
     }
 
+    @Test
+    void jobPostingCreateShouldAllowUrlOnlyRequest() throws Exception {
+        String accessToken = signupAndGetAccessToken("jobposting-url-only@example.com", Role.ADMIN);
+
+        mockMvc.perform(post("/api/v1/profiles/job-postings")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "jobUrl": "http://localhost:1/jobs/backend-engineer"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.jobUrl").value("http://localhost:1/jobs/backend-engineer"))
+                .andExpect(jsonPath("$.data.companyName").isNotEmpty())
+                .andExpect(jsonPath("$.data.positionTitle").isNotEmpty())
+                .andExpect(jsonPath("$.data.description").isNotEmpty());
+    }
+
     private String signupAndGetAccessToken(String email) throws Exception {
         return signupAndGetAccessToken(email, Role.USER);
     }

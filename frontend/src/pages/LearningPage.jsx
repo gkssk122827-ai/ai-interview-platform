@@ -8,10 +8,10 @@ import { STATUS_MESSAGES } from '../constants/messages.js'
 import usePageTitle from '../hooks/usePageTitle.js'
 
 const subjectOptions = [
-  { value: '프론트엔드', label: '프론트엔드' },
-  { value: '백엔드', label: '백엔드' },
-  { value: '풀스택', label: '풀스택' },
-  { value: '데이터베이스', label: '데이터베이스' },
+  { value: 'frontend', label: '프론트엔드' },
+  { value: 'backend', label: '백엔드' },
+  { value: 'fullstack', label: '풀스택' },
+  { value: 'database', label: '데이터베이스' },
 ]
 
 const difficultyOptions = [
@@ -23,7 +23,7 @@ const difficultyOptions = [
 function LearningPage() {
   usePageTitle('학습')
   const navigate = useNavigate()
-  const [subject, setSubject] = useState('프론트엔드')
+  const [subject, setSubject] = useState('frontend')
   const [difficulty, setDifficulty] = useState('MEDIUM')
   const [count, setCount] = useState('4')
   const [type] = useState('MULTIPLE')
@@ -47,16 +47,35 @@ function LearningPage() {
   return (
     <section className="workspace-page">
       <div className="workspace-page__hero">
-        <p className="page-card__eyebrow">학습</p>
-        <h2 className="page-card__title">IT 분야와 난이도를 선택하고 5지선다 학습을 시작해 보세요.</h2>
-        <p className="page-card__description">백엔드 learning API로 문제를 생성하고 채점까지 이어집니다.</p>
+        <p className="page-card__eyebrow">{'학습'}</p>
+        <h2 className="page-card__title">{'IT 분야 과목을 선택하고 5지선다 학습을 시작해 보세요.'}</h2>
+        <p className="page-card__description">{'백엔드 learning API로 문제를 생성하고 채점까지 이어집니다.'}</p>
       </div>
       <StatusMessage variant="error" message={error} />
       <section className="panel interview-setup-card interview-setup-card--wide">
-        <SelectField label="과목" value={subject} onChange={(event) => setSubject(event.target.value)} options={subjectOptions} />
-        <SelectField label="난이도" value={difficulty} onChange={(event) => setDifficulty(event.target.value)} options={difficultyOptions} />
-        <TextInput label="문제 수" value={count} onChange={(event) => setCount(event.target.value)} placeholder="4" />
-        <div className="button-row"><button className="button" type="button" onClick={handleStart} disabled={isLoading}>{isLoading ? STATUS_MESSAGES.preparing : '학습 시작'}</button></div>
+        <SelectField
+          label={'과목'}
+          value={subject}
+          onChange={(event) => setSubject(event.target.value)}
+          options={subjectOptions}
+        />
+        <SelectField
+          label={'난이도'}
+          value={difficulty}
+          onChange={(event) => setDifficulty(event.target.value)}
+          options={difficultyOptions}
+        />
+        <TextInput
+          label={'문제 수'}
+          value={count}
+          onChange={(event) => setCount(event.target.value)}
+          placeholder="4"
+        />
+        <div className="button-row">
+          <button className="button" type="button" onClick={handleStart} disabled={isLoading}>
+            {isLoading ? STATUS_MESSAGES.preparing : '학습 시작'}
+          </button>
+        </div>
       </section>
     </section>
   )

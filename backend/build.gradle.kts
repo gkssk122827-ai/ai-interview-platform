@@ -25,6 +25,7 @@ repositories {
 }
 
 dependencies {
+    implementation("org.apache.pdfbox:pdfbox:3.0.5")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-mysql")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")

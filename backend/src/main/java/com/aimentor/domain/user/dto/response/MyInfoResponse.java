@@ -1,6 +1,7 @@
 package com.aimentor.domain.user.dto.response;
 
 import com.aimentor.domain.user.entity.Role;
+import com.aimentor.domain.user.entity.UserStatus;
 import java.time.LocalDateTime;
 
 /**
@@ -12,6 +13,7 @@ public record MyInfoResponse(
         String email,
         String phone,
         Role role,
+        UserStatus status,
         LocalDateTime createdAt
 ) {
 }

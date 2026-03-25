@@ -3,9 +3,6 @@ package com.aimentor.domain.profile.dto.response;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * Returns job-posting data owned by the authenticated user.
- */
 public record JobPostingResponse(
         Long id,
         Long userId,
@@ -14,6 +11,8 @@ public record JobPostingResponse(
         String description,
         String fileUrl,
         String jobUrl,
+        String siteName,
+        String sourceStatus,
         LocalDate deadline,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

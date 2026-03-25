@@ -59,8 +59,8 @@ function SignupPage() {
     try {
       const result = await authApi.signup(payload)
       setUser(result.user)
-      setSuccess('회원가입이 완료되었습니다. 대시보드로 이동합니다.')
-      setTimeout(() => navigate('/dashboard'), 800)
+      setSuccess('회원가입이 완료되었습니다. 구독 페이지로 이동합니다.')
+      setTimeout(() => navigate('/subscriptions'), 800)
     } catch (signupError) {
       setError(signupError.message ?? ERROR_MESSAGES.signup)
     } finally {

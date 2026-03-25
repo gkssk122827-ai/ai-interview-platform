@@ -13,14 +13,14 @@ import { createVoiceError, getVoiceErrorMessage } from '../constants/voiceMessag
 import usePageTitle from '../hooks/usePageTitle.js'
 
 const modeLabels = {
-  COMPREHENSIVE: '\uC885\uD569',
-  BEHAVIORAL: '\uC778\uC131',
-  TECHNICAL: '\uAE30\uC220',
-  RESUME_BASED: '\uC790\uC18C\uC11C \uAE30\uBC18',
+  COMPREHENSIVE: '종합',
+  BEHAVIORAL: '인성',
+  TECHNICAL: '기술',
+  RESUME_BASED: '자소서 기반',
 }
 
 function InterviewSessionPage() {
-  usePageTitle('\uBA74\uC811 \uC9C4\uD589')
+  usePageTitle('면접 진행')
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -47,7 +47,7 @@ function InterviewSessionPage() {
   useEffect(() => {
     async function loadSession() {
       if (!sessionId) {
-        setPageError('\uBA74\uC811 \uC138\uC158 \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.')
+        setPageError('면접 세션 정보가 없습니다.')
         setIsLoading(false)
         return
       }
@@ -74,12 +74,12 @@ function InterviewSessionPage() {
   }, [sessionId])
 
   const currentQuestion = useMemo(() => session?.questions?.[currentQuestionIndex] ?? null, [session, currentQuestionIndex])
-  const feedbackMessage = session?.feedback?.improvements ?? session?.feedback?.weakPoints ?? '\uB2F5\uBCC0\uC744 \uC81C\uCD9C\uD558\uBA74 \uB2E4\uC74C \uAC1C\uC120 \uBC29\uD5A5\uC744 \uC548\uB0B4\uD574\uB4DC\uB9BD\uB2C8\uB2E4.'
+  const feedbackMessage = session?.feedback?.improvements ?? session?.feedback?.weakPoints ?? '답변을 제출하면 다음 개선 방향을 안내해드립니다.'
   const isLastQuestion = session ? currentQuestionIndex >= session.questions.length - 1 : false
   const normalizedAnswer = answer.trim()
   const existingAnswer = currentQuestion?.answerText?.trim() ?? ''
   const canAdvance = Boolean(normalizedAnswer) || Boolean(existingAnswer)
-  const modeLabel = modeLabels[session?.mode] ?? '\uBA74\uC811'
+  const modeLabel = modeLabels[session?.mode] ?? '면접'
 
   useEffect(() => {
     return () => {
@@ -185,7 +185,7 @@ function InterviewSessionPage() {
     setCurrentQuestionIndex(nextIndex)
     setAnswer(updatedSession.questions[nextIndex]?.answerText ?? '')
     setStatusVariant('success')
-    setStatusMessage('\uB2F5\uBCC0\uC774 \uC800\uC7A5\uB418\uACE0 \uB2E4\uC74C \uC9C8\uBB38\uC73C\uB85C \uC774\uB3D9\uD588\uC2B5\uB2C8\uB2E4.')
+    setStatusMessage('답변이 저장되고 다음 질문으로 이동했습니다.')
   }
 
   async function handleAdvance() {
@@ -329,9 +329,9 @@ function InterviewSessionPage() {
     return (
       <section className="workspace-page">
         <div className="workspace-page__hero">
-          <p className="page-card__eyebrow">{'\uBA74\uC811 \uC138\uC158'}</p>
-          <h2 className="page-card__title">{'\uC9C4\uD589 \uC911\uC778 \uC9C8\uBB38\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.'}</h2>
-          <p className="page-card__description">{'\uBA74\uC811 \uC124\uC815 \uD654\uBA74\uC5D0\uC11C \uC0C8 \uC138\uC158\uC744 \uC2DC\uC791\uD574 \uC8FC\uC138\uC694.'}</p>
+          <p className="page-card__eyebrow">{'면접 세션'}</p>
+          <h2 className="page-card__title">{'진행 중인 질문을 찾을 수 없습니다.'}</h2>
+          <p className="page-card__description">{'면접 설정 화면에서 새 세션을 시작해 주세요.'}</p>
         </div>
         <div className="button-row">
           <button className="button" type="button" onClick={() => navigate('/interview/setup')}>{BUTTON_LABELS.goToSetup}</button>
@@ -343,10 +343,10 @@ function InterviewSessionPage() {
   return (
     <section className="workspace-page">
       <div className="workspace-page__hero">
-        <p className="page-card__eyebrow">{'\uBA74\uC811 \uC9C4\uD589'}</p>
-        <h2 className="page-card__title">{'\uC9C8\uBB38\uC5D0 \uB2F5\uD558\uACE0 \uB2E4\uC74C \uC9C8\uBB38\uC73C\uB85C \uCC28\uADFC\uCC28\uADFC \uC9C4\uD589\uD574 \uBCF4\uC138\uC694.'}</h2>
-        <p className="page-card__description">{`\uBAA8\uB4DC: ${modeLabel} \u00B7 \uC644\uB8CC\uC728 ${session?.completionRate ?? 0}% \u00B7 \uB2F5\uBCC0 ${session?.answeredQuestions ?? 0}/${session?.totalQuestions ?? 0}`}</p>
-        {sessionSource ? <p className="page-card__description">{`\uC9C8\uBB38 \uC0DD\uC131 \uC18C\uC2A4: ${sessionSource}`}</p> : null}
+        <p className="page-card__eyebrow">{'면접 진행'}</p>
+        <h2 className="page-card__title">{'질문에 답하고 다음 질문으로 차근차근 진행해 보세요.'}</h2>
+        <p className="page-card__description">{`모드: ${modeLabel} · 완료율 ${session?.completionRate ?? 0}% · 답변 ${session?.answeredQuestions ?? 0}/${session?.totalQuestions ?? 0}`}</p>
+        {sessionSource ? <p className="page-card__description">{`질문 생성 소스: ${sessionSource}`}</p> : null}
       </div>
 
       <StatusMessage variant="error" message={session ? pageError : ''} />
@@ -370,8 +370,8 @@ function InterviewSessionPage() {
         />
         <FeedbackCard
           feedback={feedbackMessage}
-          title={'\uD604\uC7AC \uD53C\uB4DC\uBC31'}
-          description={'\uC800\uC7A5\uD55C \uB2F5\uBCC0\uC744 \uAE30\uBC18\uC73C\uB85C \uC9C0\uAE08\uAE4C\uC9C0\uC758 \uAC1C\uC120 \uBC29\uD5A5\uC744 \uBCF4\uC5EC\uB4DC\uB9BD\uB2C8\uB2E4.'}
+          title={'현재 피드백'}
+          description={'저장한 답변을 기반으로 지금까지의 개선 방향을 보여드립니다.'}
         />
         <div className="button-row">
           <button className="button button--secondary" type="button" onClick={() => navigate('/dashboard')}>{BUTTON_LABELS.goToDashboard}</button>

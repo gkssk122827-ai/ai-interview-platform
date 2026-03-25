@@ -23,8 +23,14 @@ function extractPayload(response) {
   return response?.data?.data ?? response?.data ?? null
 }
 
-function isAuthEndpoint(url) {
-  return typeof url === 'string' && url.includes('/auth/')
+function isAnonymousAuthEndpoint(url) {
+  if (typeof url !== 'string') return false
+
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/signup') ||
+    url.includes('/auth/refresh')
+  )
 }
 
 function normalizeAuthPayload(payload) {
@@ -33,7 +39,9 @@ function normalizeAuthPayload(payload) {
       id: payload.user?.id ?? payload.userId,
       name: payload.user?.name ?? payload.name ?? payload.email,
       email: payload.user?.email ?? payload.email,
+      phone: payload.user?.phone ?? payload.phone ?? '',
       role: payload.user?.role ?? payload.role,
+      status: payload.user?.status ?? payload.status ?? 'ACTIVE',
     },
     accessToken: payload.accessToken,
     accessTokenExpiresAt: payload.accessTokenExpiresAt ?? null,
@@ -159,7 +167,7 @@ apiClient.interceptors.request.use((config) => {
   const session = readStoredAuth()
   config.headers = config.headers ?? {}
 
-  if (isAuthEndpoint(config.url)) {
+  if (isAnonymousAuthEndpoint(config.url)) {
     delete config.headers.Authorization
     return config
   }
@@ -177,9 +185,9 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
     const status = error.response?.status
-    const isAuthRequest = originalRequest?.url?.includes('/auth/')
+    const isAnonymousAuthRequest = isAnonymousAuthEndpoint(originalRequest?.url)
 
-    if (status !== 401 || !originalRequest || originalRequest._retry || isAuthRequest) {
+    if (status !== 401 || !originalRequest || originalRequest._retry || isAnonymousAuthRequest) {
       return Promise.reject(error)
     }
 

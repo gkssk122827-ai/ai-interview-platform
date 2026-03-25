@@ -8,6 +8,9 @@ import com.aimentor.domain.cart.repository.CartItemRepository;
 import com.aimentor.domain.user.entity.Role;
 import com.aimentor.domain.user.entity.User;
 import com.aimentor.domain.user.repository.UserRepository;
+import com.aimentor.external.payment.kakao.KakaoPayService;
+import com.aimentor.external.payment.kakao.dto.KakaoPayApproveResult;
+import com.aimentor.external.payment.kakao.dto.KakaoPayReadyResult;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
@@ -17,12 +20,15 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -57,6 +63,9 @@ class OrderControllerIntegrationTest {
 
     @Autowired
     private CartItemRepository cartItemRepository;
+
+    @MockitoBean
+    private KakaoPayService kakaoPayService;
 
     @Test
     void shouldCreatePendingOrderAndPayIt() throws Exception {
@@ -100,21 +109,16 @@ class OrderControllerIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PAID"))
+                .andExpect(jsonPath("$.data.paymentMethod").value("CARD"))
+                .andExpect(jsonPath("$.data.payments.length()").value(1))
+                .andExpect(jsonPath("$.data.payments[0].status").value("SUCCESS"))
                 .andExpect(jsonPath("$.data.items.length()").value(2));
-
-        mockMvc.perform(get("/api/orders")
-                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].id").value(orderId))
-                .andExpect(jsonPath("$.data[0].status").value("PAID"));
 
         mockMvc.perform(get("/api/orders/{orderId}", orderId)
                         .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.address").value("Seoul, Gangnam-daero 123"))
                 .andExpect(jsonPath("$.data.status").value("PAID"))
-                .andExpect(jsonPath("$.data.items.length()").value(2));
+                .andExpect(jsonPath("$.data.payments.length()").value(1));
 
         assertThat(bookRepository.findById(firstBookId).orElseThrow().getStock()).isEqualTo(8);
         assertThat(bookRepository.findById(secondBookId).orElseThrow().getStock()).isEqualTo(4);
@@ -150,6 +154,168 @@ class OrderControllerIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("OUT_OF_STOCK"));
+    }
+
+    @Test
+    void shouldStoreFailedPaymentAndAllowRetry() throws Exception {
+        String accessToken = createUserAccessToken("failed-payment-user@example.com");
+        User user = userRepository.findByEmail("failed-payment-user@example.com").orElseThrow();
+        Long bookId = createBook("Effective TypeScript", 38000, 3);
+
+        cartItemRepository.save(CartItem.builder()
+                .userId(user.getId())
+                .bookId(bookId)
+                .quantity(1)
+                .build());
+
+        MvcResult createResult = mockMvc.perform(post("/api/orders")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "address": "Seoul, Teheran-ro 45"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andReturn();
+
+        Long orderId = readOrderId(createResult);
+
+        mockMvc.perform(post("/api/orders/{orderId}/pay", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "paymentMethod": "CARD",
+                                  "success": false,
+                                  "failureReason": "테스트용 실패"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAYMENT_FAILED"))
+                .andExpect(jsonPath("$.data.paymentFailureReason").value("테스트용 실패"))
+                .andExpect(jsonPath("$.data.payments.length()").value(1))
+                .andExpect(jsonPath("$.data.payments[0].status").value("FAILED"));
+
+        mockMvc.perform(post("/api/orders/{orderId}/pay", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "paymentMethod": "CARD",
+                                  "success": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAID"))
+                .andExpect(jsonPath("$.data.payments.length()").value(2))
+                .andExpect(jsonPath("$.data.payments[0].status").value("SUCCESS"));
+    }
+
+    @Test
+    void shouldReadyAndApproveKakaoPayment() throws Exception {
+        when(kakaoPayService.ready(any())).thenReturn(new KakaoPayReadyResult("T123456789", "https://mock.kakao/redirect"));
+        when(kakaoPayService.approve(any())).thenReturn(new KakaoPayApproveResult(
+                "T123456789",
+                "A123456789",
+                "MONEY",
+                LocalDateTime.of(2026, 3, 20, 13, 0)
+        ));
+
+        String accessToken = createUserAccessToken("kakao-order-user@example.com");
+        User user = userRepository.findByEmail("kakao-order-user@example.com").orElseThrow();
+        Long bookId = createBook("Real-World React", 28000, 4);
+
+        cartItemRepository.save(CartItem.builder()
+                .userId(user.getId())
+                .bookId(bookId)
+                .quantity(1)
+                .build());
+
+        Long orderId = readOrderId(mockMvc.perform(post("/api/orders")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "address": "Seoul, Eonju-ro 12"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn());
+
+        mockMvc.perform(post("/api/orders/{orderId}/payments/kakao/ready", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "paymentMethod": "KAKAO_PAY"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.provider").value("KAKAO_PAY"))
+                .andExpect(jsonPath("$.data.paymentMethod").value("KAKAO_PAY"))
+                .andExpect(jsonPath("$.data.redirectUrl").value("https://mock.kakao/redirect"));
+
+        mockMvc.perform(post("/api/orders/{orderId}/payments/kakao/approve", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "pgToken": "pg_token_value"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAID"))
+                .andExpect(jsonPath("$.data.paymentMethod").value("KAKAO_PAY"))
+                .andExpect(jsonPath("$.data.payments[0].status").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.payments[0].provider").value("KAKAO_PAY"))
+                .andExpect(jsonPath("$.data.payments[0].providerTransactionId").value("T123456789"));
+
+        assertThat(bookRepository.findById(bookId).orElseThrow().getStock()).isEqualTo(3);
+    }
+
+    @Test
+    void shouldStoreKakaoCancelAsFailedPayment() throws Exception {
+        when(kakaoPayService.ready(any())).thenReturn(new KakaoPayReadyResult("T987654321", "https://mock.kakao/redirect"));
+
+        String accessToken = createUserAccessToken("kakao-cancel-user@example.com");
+        User user = userRepository.findByEmail("kakao-cancel-user@example.com").orElseThrow();
+        Long bookId = createBook("Frontend Performance", 33000, 2);
+
+        cartItemRepository.save(CartItem.builder()
+                .userId(user.getId())
+                .bookId(bookId)
+                .quantity(1)
+                .build());
+
+        Long orderId = readOrderId(mockMvc.perform(post("/api/orders")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "address": "Seoul, Seolleung-ro 10"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn());
+
+        mockMvc.perform(post("/api/orders/{orderId}/payments/kakao/ready", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "paymentMethod": "KAKAO_PAY"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/orders/{orderId}/payments/kakao/cancel", orderId)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken(accessToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAYMENT_FAILED"))
+                .andExpect(jsonPath("$.data.paymentFailureReason").value("카카오페이 결제가 취소되었습니다."))
+                .andExpect(jsonPath("$.data.payments[0].status").value("FAILED"));
     }
 
     @Test

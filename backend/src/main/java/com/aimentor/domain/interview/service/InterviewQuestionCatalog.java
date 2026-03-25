@@ -148,6 +148,83 @@ public final class InterviewQuestionCatalog {
         return InterviewQuestionDifficulty.HARD;
     }
 
+    public static InterviewQuestionCategory resolveCategoryFromContext(String... contextTexts) {
+        List<String> normalizedContexts = contextTexts == null
+                ? List.of()
+                : List.of(contextTexts).stream()
+                .filter(value -> value != null && !value.isBlank())
+                .toList();
+        String combinedText = String.join(" ", normalizedContexts)
+                .toLowerCase(Locale.ROOT);
+
+        int frontendScore = countKeywordHits(
+                combinedText,
+                "front",
+                "frontend",
+                "front-end",
+                "front end",
+                "프론트",
+                "프론트엔드",
+                "react",
+                "next.js",
+                "nextjs",
+                "vue",
+                "angular",
+                "javascript",
+                "typescript",
+                "html",
+                "css",
+                "sass",
+                "tailwind",
+                "browser",
+                "web",
+                "ui",
+                "ux",
+                "accessibility",
+                "접근성",
+                "렌더링",
+                "컴포넌트",
+                "상태 관리"
+        );
+        int backendScore = countKeywordHits(
+                combinedText,
+                "back",
+                "backend",
+                "back-end",
+                "back end",
+                "백엔드",
+                "server",
+                "api",
+                "spring",
+                "jpa",
+                "hibernate",
+                "mysql",
+                "mariadb",
+                "redis",
+                "kafka",
+                "queue",
+                "transaction",
+                "database",
+                "db",
+                "infra",
+                "devops",
+                "docker",
+                "kubernetes"
+        );
+
+        return frontendScore >= backendScore ? InterviewQuestionCategory.FRONTEND : InterviewQuestionCategory.BACKEND;
+    }
+
+    private static int countKeywordHits(String text, String... keywords) {
+        int score = 0;
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                score++;
+            }
+        }
+        return score;
+    }
+
     public static List<String> findQuestions(
             InterviewMode mode,
             InterviewQuestionCategory category,
